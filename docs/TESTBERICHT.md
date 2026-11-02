@@ -55,6 +55,12 @@ bestanden.**
 | Editor | Raster ist 20 Pixel | OK |
 | Editor | Speichern, Laden, Validieren | OK |
 | Editor | SVG- und PDF-Export (gültiges PDF) | OK |
+| Editor | Kurzschluss L–N wird als Fehler erkannt | OK |
+| Editor | Körperschluss L–PE wird als Fehler erkannt | OK |
+| Editor | Korrekte Schaltung wird ohne Beanstandung akzeptiert | OK |
+| Editor | Unbekannter Anschluss wird als Fehler erkannt | OK |
+| Editor | Offener Anschluss wird gemeldet | OK |
+| Editor | Alle 17 Frontend-Module syntaktisch fehlerfrei | OK |
 | Home Assistant | 12 Sensoren definiert | OK |
 | Home Assistant | Ohne Token sauber als „nicht verfügbar“ gemeldet | OK |
 
