@@ -1,0 +1,80 @@
+name: ElektroCoach
+version: "0.1.0"
+slug: elektrocoach
+description: >-
+  Lernplattform fuer die Ausbildung zum Elektroniker fuer Energie- und
+  Gebaeudetechnik: Wissensdatenbank, Lernsystem, Pruefungssimulation,
+  Schaltplaneditor und KI-Assistent (Ollama + Google Gemini Free Tier).
+url: https://github.com/Dealwirth/ElektroCoach
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: application
+boot: auto
+ingress: true
+ingress_port: 8099
+ingress_stream: true
+panel_icon: mdi:school-outline
+panel_title: ElektroCoach
+panel_admin: false
+homeassistant_api: true
+hassio_api: true
+hassio_role: default
+host_pid: false
+full_access: false
+uart: false
+usb: false
+gpio: false
+kernel_modules: false
+map:
+  - type: share
+    read_only: false
+  - type: ssl
+    read_only: false
+options:
+  log_level: info
+  data_dir: /data
+  ollama_url: "http://a0d7b954-ollama:11434"
+  ollama_model: "qwen2.5:1.5b"
+  ollama_enabled: true
+  ollama_unload_after_seconds: 900
+  gemini_enabled: false
+  gemini_api_key: ""
+  gemini_model: "gemini-2.0-flash"
+  gemini_daily_request_budget: 200
+  ha_notifications_enabled: true
+  notify_service: ""
+  auto_repair_enabled: true
+  storage_warning_percent: 90
+  storage_critical_percent: 95
+  backup_enabled: true
+  backup_interval_hours: 24
+  backup_keep: 7
+  backup_dir: "/share/elektrocoach/backups"
+  monitoring_interval_seconds: 60
+  seed_demo_data: false
+  ocr_language: "deu+eng"
+schema:
+  log_level: list(trace|debug|info|notice|warning|error|fatal)
+  data_dir: str
+  ollama_url: str
+  ollama_model: str
+  ollama_enabled: bool
+  ollama_unload_after_seconds: int(0,86400)
+  gemini_enabled: bool
+  gemini_api_key: password
+  gemini_model: str
+  gemini_daily_request_budget: int(0,100000)
+  ha_notifications_enabled: bool
+  notify_service: str
+  auto_repair_enabled: bool
+  storage_warning_percent: int(50,99)
+  storage_critical_percent: int(51,100)
+  backup_enabled: bool
+  backup_interval_hours: int(1,720)
+  backup_keep: int(1,100)
+  backup_dir: str
+  monitoring_interval_seconds: int(15,3600)
+  seed_demo_data: bool
+  ocr_language: str

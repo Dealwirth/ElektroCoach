@@ -1,0 +1,8 @@
+build_from:
+  aarch64: ghcr.io/home-assistant/aarch64-base:3.20
+  amd64: ghcr.io/home-assistant/amd64-base:3.20
+labels:
+  org.opencontainers.image.title: ElektroCoach Ollama
+  org.opencontainers.image.description: Lokaler Ollama-Server fuer ElektroCoach
+  org.opencontainers.image.source: https://github.com/Dealwirth/ElektroCoach
+  org.opencontainers.image.licenses: MIT

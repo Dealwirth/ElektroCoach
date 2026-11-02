@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<!--
+  ElektroCoach shell served by the backend.
+
+  `{{ ingress_base }}` is replaced by the backend with the current request path
+  (either "/" or the Ingress prefix). The <base> tag makes every relative URL –
+  scripts, styles, API calls and the WebSocket path – work under Ingress without
+  any hard-coded absolute paths.
+-->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#1d5fd0" />
+    <title>ElektroCoach</title>
+    <base href="{{ ingress_base }}" />
+    <link rel="stylesheet" href="assets/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">EC</span>
+        <span class="brand-text">
+          <span>ElektroCoach</span>
+          <span class="brand-sub">Energie- und Gebäudetechnik</span>
+        </span>
+      </div>
+
+      <header class="topbar">
+        <button
+          class="btn btn-ghost nav-toggle"
+          id="nav-toggle"
+          type="button"
+          aria-label="Navigation öffnen"
+        >
+          ☰
+        </button>
+        <span class="topbar-title" id="topbar-title">Dashboard</span>
+        <div class="topbar-status" id="topbar-status"></div>
+      </header>
+
+      <nav class="sidebar" id="sidebar" aria-label="Hauptnavigation"></nav>
+
+      <main class="main" id="main" role="main">
+        <div class="loading"><span class="spinner"></span><span>ElektroCoach wird geladen …</span></div>
+      </main>
+    </div>
+
+    <div id="toasts" role="status" aria-live="polite"></div>
+
+    <noscript>
+      <div class="alert alert-warning" style="margin: 20px">
+        ElektroCoach benötigt JavaScript. Bitte aktivieren Sie JavaScript in Ihrem Browser.
+      </div>
+    </noscript>
+
+    <script type="module" src="assets/app.js"></script>
+  </body>
+</html>
