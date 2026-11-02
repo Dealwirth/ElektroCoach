@@ -4,7 +4,7 @@ slug: elektrocoach_ollama
 description: >-
   Lokaler Ollama-Server fuer ElektroCoach. Stellt kleine Sprachmodelle
   (z. B. qwen2.5:1.5b) auf dem Raspberry Pi 4 bereit. Keine Cloud, keine Kosten.
-url: https://github.com/elektrocoach/elektrocoach-repository
+url: https://github.com/Dealwirth/ElektroCoach
 arch:
   - aarch64
   - amd64

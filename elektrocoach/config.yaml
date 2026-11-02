@@ -5,7 +5,7 @@ description: >-
   Lernplattform fuer die Ausbildung zum Elektroniker fuer Energie- und
   Gebaeudetechnik: Wissensdatenbank, Lernsystem, Pruefungssimulation,
   Schaltplaneditor und KI-Assistent (Ollama + Google Gemini Free Tier).
-url: https://github.com/elektrocoach/elektrocoach-repository
+url: https://github.com/Dealwirth/ElektroCoach
 arch:
   - aarch64
   - amd64

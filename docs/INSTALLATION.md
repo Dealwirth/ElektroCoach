@@ -26,7 +26,7 @@ soll.
 4. Tragen Sie im Feld **Add repository** diese Adresse ein:
 
    ```text
-   https://github.com/elektrocoach/elektrocoach-repository
+   https://github.com/Dealwirth/ElektroCoach
    ```
 
 5. Klicken Sie auf **Hinzufügen** und schließen Sie das Fenster.

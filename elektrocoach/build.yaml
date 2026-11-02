@@ -4,5 +4,5 @@ build_from:
 labels:
   org.opencontainers.image.title: ElektroCoach
   org.opencontainers.image.description: Lernplattform fuer Elektroniker Energie- und Gebaeudetechnik
-  org.opencontainers.image.source: https://github.com/elektrocoach/elektrocoach-repository
+  org.opencontainers.image.source: https://github.com/Dealwirth/ElektroCoach
   org.opencontainers.image.licenses: MIT

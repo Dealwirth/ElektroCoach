@@ -36,7 +36,7 @@ getestet"** gekennzeichnet. Es werden keine Ergebnisse erfunden.
 1. Home Assistant → **Einstellungen → Add-ons → Add-on Store**
 2. Oben rechts **⋮ → Repositories** öffnen
 3. Diese Repository-URL eintragen:
-   `https://github.com/elektrocoach/elektrocoach-repository`
+   `https://github.com/Dealwirth/ElektroCoach`
 4. **ElektroCoach Ollama** installieren und starten (lädt das Modell im
    Hintergrund).
 5. **ElektroCoach** installieren und starten.
