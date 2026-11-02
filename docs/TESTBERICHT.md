@@ -114,7 +114,35 @@ echten Blockern („Verbindung zu Home Assistant prüfen“, „KI-Verbindungen
 prüfen“) und verweigerte den Abschluss. Er zeigt damit **keinen** fälschlichen
 Erfolg an.
 
-## 6. Bewusst NICHT praktisch getestete Punkte
+## 6. Container-Build und Betrieb (praktisch getestet)
+
+Das Docker-Image wurde aus dem **echten** `Dockerfile` gebaut:
+
+```bash
+docker build --build-arg BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20 \
+  -t elektrocoach:amd64-verify elektrocoach
+```
+
+| Prüfung | Ergebnis |
+|---|---|
+| Image-Build (amd64) | Erfolgreich |
+| Start im Container | „ElektroCoach 0.1.0 ready“, Uvicorn auf Port 8099 |
+| Optionen aus `/data/options.json` | Gelesen und angewendet |
+| Website ausgeliefert | Startseite und Assets mit HTTP 200 |
+| OCR im ausgelieferten Image | Tesseract `deu`, 82,5 % Konfidenz, Text korrekt erkannt |
+| Wissenseintrag aus Import | 1 Eintrag erzeugt |
+| Auftragswarteschlange | Auftrag „done“, Dokument „processed“ |
+
+Damit ist belegt, dass das **tatsächlich ausgelieferte Artefakt** läuft und
+Dokumente verarbeitet – nicht nur die Entwicklungsumgebung.
+
+Ein **ARM64-Build** (`linux/arm64`) war nicht möglich: Die QEMU/binfmt-
+Registrierung ist in dieser Umgebung gesperrt
+(`/proc/sys/fs/binfmt_misc/register`: „Read-only file system“). Die
+Build-Dateien für `aarch64` sind vorhanden, der Build selbst wurde nicht
+ausgeführt.
+
+## 7. Bewusst NICHT praktisch getestete Punkte
 
 Diese Punkte konnten in dieser Umgebung **nicht** praktisch geprüft werden. Sie
 sind im Code enthalten und automatisiert getestet, aber **nicht** auf echter
