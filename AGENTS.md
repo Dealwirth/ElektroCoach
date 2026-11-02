@@ -48,7 +48,7 @@ Virtuelle Umgebung: `/workspace/project/.venv/bin/python`
 ```bash
 cd elektrocoach-repository/elektrocoach
 
-# Tests (135 Tests, ca. 4 s)
+# Tests (139 Tests, ca. 4 s)
 /workspace/project/.venv/bin/python -m pytest elektrocoach/tests -q
 
 # Nur ein Modul
@@ -144,9 +144,29 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:18099/healthz
   `maintainer`. Jedes Add-on braucht `config.yaml` mit `slug`, `version`,
   `arch`, `ingress`.
 
+## Repository und Veröffentlichung
+
+- **GitHub-Ziel**: `https://github.com/Dealwirth/ElektroCoach`
+  (Standardbranch `main`). Das Repository hat nur einen Stub-Commit; die Arbeit
+  liegt auf dem Branch `elektrocoach-addon` und wird über einen Pull Request
+  eingebracht. **Nie direkt auf `main` pushen.**
+- **Lokales Git**: Das Projektverzeichnis
+  `elektrocoach-repository/` ist ein eigenes Git-Repository (Branch `main`
+  bzw. `elektrocoach-addon`). Das übergeordnete `/workspace/project` hat ein
+  eigenes, leeres Repository — nicht verwechseln.
+- **Remote-URL** enthält das Token:
+  `git remote set-url origin https://${GITHUB_TOKEN}@github.com/Dealwirth/ElektroCoach.git`
+- Das Token des Agenten darf **keine** Repositories anlegen
+  („Resource not accessible by integration“). Vorhandene Repositories mit
+  Push-Recht funktionieren.
+
 ## Offene Punkte
 
 - ARM64-Image wurde noch nicht auf echter Hardware (Raspberry Pi 4) gebaut und
-  getestet. Der amd64-Build und alle Funktionstests laufen lokal.
-- Es gibt noch kein Git-Remote. Repository ist lokal unter
-  `/workspace/project` (Branch `master`, noch keine Commits).
+  getestet. Der amd64-Build läuft lokal (Image gebaut, gestartet, OCR geprüft);
+  ein Cross-Build für `linux/arm64` ist in dieser Umgebung nicht möglich, weil
+  die QEMU/binfmt-Registrierung gesperrt ist
+  (`/proc/sys/fs/binfmt_misc/register`: „Read-only file system“).
+- Betrieb über den Home-Assistant-Add-on-Store, Ingress, echte HA-Sensoren und
+  Benachrichtigungen sowie echte Ollama-/Gemini-Konten sind nicht praktisch
+  getestet. Siehe `docs/TESTBERICHT.md`, Abschnitt 7.
