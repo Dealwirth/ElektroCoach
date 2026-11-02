@@ -1,0 +1,55 @@
+# AppArmor profile for the ElektroCoach add-on.
+#
+# ElektroCoach runs as a Home Assistant add-on with `full_access: false`,
+# `host_pid: false` and no direct hardware access. It only needs to
+#   * read its own program files below /app,
+#   * read and write its data below /data and its backups below /share,
+#   * reach Home Assistant through the supervisor proxy on 127.0.0.1,
+#   * reach Ollama through the Docker network.
+# Everything else is denied. The profile is intentionally close to the
+# default Home Assistant add-on profile, with network access added because
+# the AI features need it.
+
+#include <tunables/global>
+
+profile elektrocoach flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # The application itself.
+  /app/** r,
+  /usr/bin/python3* ix,
+  /usr/lib/python3*/** r,
+  /usr/local/lib/python3*/** r,
+
+  # External helpers used by the document pipeline.
+  /usr/bin/tesseract ix,
+  /usr/bin/pdftoppm ix,
+  /usr/bin/pdfinfo ix,
+  /usr/share/tesseract-ocr/** r,
+  /usr/share/tessdata/** r,
+  /tmp/** rw,
+  /tmp/ rw,
+
+  # Persistent data and backups.
+  /data/** rw,
+  /share/** rw,
+  /ssl/** r,
+  /media/** rw,
+
+  # Networking for Home Assistant, Ollama and Google Gemini.
+  network inet tcp,
+  network inet udp,
+  network inet6 tcp,
+  network inet6 udp,
+
+  # Read-only views the base image expects.
+  /etc/ssl/** r,
+  /etc/ca-certificates/** r,
+  /run/** r,
+  /proc/self/** r,
+  /sys/devices/system/cpu/** r,
+
+  # Deny anything that could weaken the system.
+  deny /proc/sys/** w,
+  deny /sys/** w,
+}
