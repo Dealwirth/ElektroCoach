@@ -18,8 +18,8 @@ SUPERVISOR_URL = "http://supervisor"
 
 DEFAULTS: dict[str, Any] = {
     "gemini_api_key": "",
-    "gemini_text_model": "gemini-2.5-flash",
-    "gemini_vision_model": "gemini-2.5-flash",
+    "gemini_text_model": "gemini-flash-latest",
+    "gemini_vision_model": "gemini-flash-latest",
     "ollama_url": "http://localhost:11434",
     "ollama_model": "llama3.2:3b",
     "ollama_enabled": False,

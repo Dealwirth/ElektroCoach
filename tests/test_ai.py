@@ -164,6 +164,125 @@ def test_router_ohne_ki_meldet_klaren_fehler():
     assert "Keine KI erreichbar" in result["error"] or "deaktiviert" in result["error"]
 
 
+def test_gemini_wechselt_bei_abgestelltem_modell(monkeypatch):
+    """Google stellt Modelle ab (HTTP 404). Die App muss selbst ein
+    nutzbares Modell finden und dieses merken."""
+    settings.set_runtime("gemini_api_key", "test-key")
+    settings.set_runtime("gemini_text_model", "gemini-2.5-flash")
+    settings.set_runtime("ai_max_retries", 0)
+    seen: list[str] = []
+
+    class FakeResponse:
+        def __init__(self, status_code, payload):
+            self.status_code = status_code
+            self._payload = payload
+            self.text = str(payload)
+
+        def json(self):
+            return self._payload
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, **kwargs):
+            name = url.split("/models/", 1)[1].split(":", 1)[0]
+            seen.append(name)
+            if name == "gemini-2.5-flash":
+                return FakeResponse(404, {"error": {"code": 404, "message": "no longer available"}})
+            return FakeResponse(
+                200, {"candidates": [{"content": {"parts": [{"text": "Antwort"}]}}]}
+            )
+
+    async def fake_list():
+        return {
+            "available": True,
+            "models": ["gemini-2.5-flash", "gemini-3.5-flash"],
+            "free_tier_candidates": ["gemini-3.5-flash"],
+        }
+
+    monkeypatch.setattr(gemini.httpx, "AsyncClient", FakeClient)
+    monkeypatch.setattr(gemini, "list_models", fake_list)
+    monkeypatch.setattr(gemini.asyncio, "sleep", _no_sleep)
+    gemini.invalidate_model_cache()
+
+    result = _run(gemini.generate("Test"))
+    assert result["ok"] is True
+    assert result["model"] != "gemini-2.5-flash"
+    assert "gemini-2.5-flash" in seen
+    assert settings.get("gemini_text_model") == result["model"]
+
+
+def test_gemini_wechselt_bei_ueberlastetem_modell(monkeypatch):
+    """HTTP 503 (Modell ueberlastet) darf nicht zum Abbruch fuehren, solange
+    ein anderes Modell antwortet."""
+    settings.set_runtime("gemini_api_key", "test-key")
+    settings.set_runtime("gemini_text_model", "gemini-flash-latest")
+    settings.set_runtime("ai_max_retries", 0)
+
+    class FakeResponse:
+        def __init__(self, status_code, payload):
+            self.status_code = status_code
+            self._payload = payload
+            self.text = str(payload)
+
+        def json(self):
+            return self._payload
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, **kwargs):
+            name = url.split("/models/", 1)[1].split(":", 1)[0]
+            if name == "gemini-flash-latest":
+                return FakeResponse(503, {"error": {"code": 503, "message": "high demand"}})
+            return FakeResponse(
+                200, {"candidates": [{"content": {"parts": [{"text": "Antwort"}]}}]}
+            )
+
+    async def fake_list():
+        return {
+            "available": True,
+            "models": ["gemini-flash-latest", "gemini-3.5-flash"],
+            "free_tier_candidates": ["gemini-3.5-flash"],
+        }
+
+    monkeypatch.setattr(gemini.httpx, "AsyncClient", FakeClient)
+    monkeypatch.setattr(gemini, "list_models", fake_list)
+    monkeypatch.setattr(gemini.asyncio, "sleep", _no_sleep)
+    gemini.invalidate_model_cache()
+
+    result = _run(gemini.generate("Test"))
+    assert result["ok"] is True
+    assert result["model"] == "gemini-3.5-flash"
+
+
+def test_gemini_modellwahl_ueberspringt_bildmodelle():
+    """Bild- und Pro-Modelle sind keine gueltigen Text-Kandidaten."""
+    models = [
+        "gemini-2.5-pro",
+        "gemini-3-pro-image",
+        "gemini-2.5-flash",
+        "gemini-3.5-flash",
+        "gemini-2.5-flash-preview-tts",
+    ]
+    chosen = gemini.pick_model("abgestellt", models)
+    assert chosen == "gemini-3.5-flash"
+
+
 def test_router_im_modus_off():
     settings.set_runtime("ai_mode", "off")
     result = _run(ai_router.complete("Frage"))

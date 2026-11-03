@@ -29,14 +29,108 @@ log = logging.getLogger(__name__)
 PROVIDER = "gemini"
 API_BASE = "https://generativelanguage.googleapis.com/v1beta"
 
-# Modelle, die im kostenlosen Kontingent nutzbar sind (Praefix-Reihenfolge =
-# Fallback-Reihenfolge). Pro-Modelle sind seit April 2026 kostenpflichtig.
+# Bevorzugte Modelle im kostenlosen Kontingent (Reihenfolge = Fallback).
+# Die Liste ist nur eine Vorauswahl: Zur Laufzeit wird sie gegen die
+# tatsaechlich verfuegbaren Modelle geprueft. Google stellt Modelle regelmaessig
+# ab ("no longer available to new users"), deshalb wird das aktive Modell
+# automatisch neu bestimmt, wenn eine Anfrage mit HTTP 404 scheitert.
 FREE_TIER_PREFERENCE = [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
     "gemini-flash-latest",
-    "gemini-2.0-flash",
+    "gemini-3.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
+    "gemini-flash-lite-latest",
+    "gemini-2.5-flash-lite",
 ]
+
+# Modelle, die fuer Text- und Bildaufgaben nicht geeignet sind. Pro-Modelle
+# sind im kostenlosen Kontingent nicht nutzbar und werden deshalb uebersprungen.
+_MODEL_EXCLUDE = ("image", "tts", "live", "transcribe", "embedding", "aqa", "audio", "pro", "nano-banana")
+
+_model_cache: dict[str, Any] = {"at": 0.0, "models": []}
+_MODEL_CACHE_TTL = 6 * 3600.0
+
+
+def _model_rank(name: str) -> tuple[int, int]:
+    """Sortierschluessel: hohe Version und 'flash' vor 'lite' bevorzugen."""
+    import re
+
+    match = re.search(r"gemini-(\d+)(?:\.(\d+))?", name)
+    major = int(match.group(1)) if match else 0
+    minor = int(match.group(2)) if match and match.group(2) else 0
+    lite_penalty = -1 if "lite" in name else 0
+    return (major * 100 + minor + lite_penalty, -len(name))
+
+
+def _usable_models(names: list[str]) -> list[str]:
+    return [n for n in names if not any(x in n for x in _MODEL_EXCLUDE)]
+
+
+async def _fetch_models() -> list[str]:
+    info = await list_models()
+    return info.get("models", []) if info.get("available") else []
+
+
+async def available_models(refresh: bool = False) -> list[str]:
+    """Verfuegbare Modelle, kurzzeitig zwischengespeichert."""
+    now = asyncio.get_event_loop().time()
+    if not refresh and _model_cache["models"] and now - _model_cache["at"] < _MODEL_CACHE_TTL:
+        return _model_cache["models"]
+    models = await _fetch_models()
+    if models:
+        _model_cache["models"] = models
+        _model_cache["at"] = now
+    return models or _model_cache["models"]
+
+
+async def model_candidates(preferred: str | None = None, images: bool = False,
+                           refresh: bool = False) -> list[str]:
+    """Kandidaten in sinnvoller Reihenfolge.
+
+    Das konfigurierte Modell steht zuerst. Danach folgen die bevorzugten
+    Modelle und die von der Schnittstelle gemeldeten Modelle. Die Liste wird
+    zur Laufzeit durchprobiert, weil Google Modelle abstellt, sie aber
+    teilweise weiterhin auflistet.
+    """
+    preferred = preferred or (vision_model() if images else text_model())
+    listed = await available_models(refresh=refresh)
+    ordered: list[str] = [preferred, *FREE_TIER_PREFERENCE]
+    ordered.extend(sorted(_usable_models(listed), key=_model_rank, reverse=True))
+    seen: set[str] = set()
+    result: list[str] = []
+    for name in ordered:
+        if name and name not in seen:
+            seen.add(name)
+            result.append(name)
+    return result
+
+
+def pick_model(configured: str, models: list[str]) -> str:
+    """Waehlt aus einer Modellliste das beste nutzbare Modell."""
+    usable = _usable_models(models)
+    if configured in models:
+        return configured
+    for candidate in FREE_TIER_PREFERENCE:
+        if candidate in usable:
+            return candidate
+    if usable:
+        return sorted(usable, key=_model_rank, reverse=True)[0]
+    return configured
+
+
+async def resolve_model(configured: str | None = None, refresh: bool = False) -> str:
+    """Bestimmt ein tatsaechlich nutzbares Modell (nur anhand der Liste)."""
+    configured = configured or text_model()
+    models = await available_models(refresh=refresh)
+    if not models:
+        return configured
+    return pick_model(configured, models)
+
+
+def invalidate_model_cache() -> None:
+    _model_cache["models"] = []
+    _model_cache["at"] = 0.0
+
 
 _TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=60.0, pool=10.0)
 
@@ -55,11 +149,11 @@ def api_key() -> str:
 
 
 def text_model() -> str:
-    return str(settings.get("gemini_text_model", "gemini-2.5-flash"))
+    return str(settings.get("gemini_text_model", "gemini-flash-latest"))
 
 
 def vision_model() -> str:
-    return str(settings.get("gemini_vision_model", "gemini-2.5-flash"))
+    return str(settings.get("gemini_vision_model", "gemini-flash-latest"))
 
 
 def is_configured() -> bool:
@@ -104,13 +198,20 @@ async def health() -> dict[str, Any]:
     info = await list_models()
     if not info.get("available"):
         return {"available": False, "reason": info.get("reason"), "quota": quota}
+    models = info.get("models", [])
+    # Konfigurierte Modelle koennen von Google abgestellt worden sein.
+    resolved_text = pick_model(text_model(), models)
+    resolved_vision = pick_model(vision_model(), models)
     return {
         "available": True,
         "quota": quota,
-        "text_model": text_model(),
-        "vision_model": vision_model(),
-        "text_model_available": text_model() in info["models"],
-        "vision_model_available": vision_model() in info["models"],
+        "text_model": resolved_text,
+        "vision_model": resolved_vision,
+        "configured_text_model": text_model(),
+        "configured_vision_model": vision_model(),
+        "model_changed": resolved_text != text_model() or resolved_vision != vision_model(),
+        "text_model_available": resolved_text in models,
+        "vision_model_available": resolved_vision in models,
         "free_tier_candidates": info.get("free_tier_candidates", []),
     }
 
@@ -146,7 +247,17 @@ async def generate(
             "quota_exhausted": True,
         }
 
-    use_model = model or (vision_model() if images else text_model())
+    if model:
+        use_model = model
+        candidates: list[str] = []
+    else:
+        # Kandidatenliste aufbauen. Das konfigurierte Modell steht zuerst.
+        # Google stellt Modelle regelmaessig ab, deshalb wird bei einem
+        # Fehler 404 automatisch das naechste Modell probiert.
+        candidates = await model_candidates(
+            vision_model() if images else text_model(), images=images
+        )
+        use_model = candidates.pop(0)
     payload: dict[str, Any] = {
         "contents": [{"role": "user", "parts": _build_parts(prompt, images)}],
         "generationConfig": {
@@ -169,15 +280,18 @@ async def generate(
         payload["generationConfig"]["responseMimeType"] = "application/json"
 
     last_error = "unbekannter Fehler"
-    for attempt in range(retries + 1):
+    attempts = 0
+    max_attempts = retries + 1 + (0 if model else 4)
+    while attempts < max_attempts:
+        attempts += 1
         try:
             async with httpx.AsyncClient(timeout=_timeout()) as client:
                 resp = await client.post(_url(use_model), headers=_headers(), json=payload)
             if resp.status_code == 429:
                 last_error = "429 Kontingent/Ratenlimit erreicht"
                 ai_usage.record(PROVIDER, use_model, task, False, last_error)
-                if attempt < retries:
-                    await asyncio.sleep(2.0 * (attempt + 1))
+                if attempts <= retries:
+                    await asyncio.sleep(2.0 * attempts)
                     continue
                 return {
                     "ok": False,
@@ -185,11 +299,29 @@ async def generate(
                     "provider": PROVIDER,
                     "quota_exhausted": True,
                 }
+            if resp.status_code in (404, 503) and not model:
+                # Modell abgestellt (404) oder ueberlastet (503). Das naechste
+                # in Frage kommende Modell probieren. Manche Modelle werden
+                # noch aufgelistet, sind aber nicht mehr nutzbar, und die
+                # Auslastung ist pro Modell unterschiedlich.
+                last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                ai_usage.record(PROVIDER, use_model, task, False, last_error)
+                if not candidates:
+                    invalidate_model_cache()
+                    candidates = await model_candidates(
+                        vision_model() if images else text_model(), images=images, refresh=True
+                    )
+                if candidates:
+                    use_model = candidates.pop(0)
+                    log.warning("Gemini-Modell nicht nutzbar (%s), naechster Versuch: %s",
+                                resp.status_code, use_model)
+                    continue
+                return {"ok": False, "error": last_error, "provider": PROVIDER, "model": use_model}
             if resp.status_code >= 400:
                 last_error = f"HTTP {resp.status_code}: {resp.text[:300]}"
                 ai_usage.record(PROVIDER, use_model, task, False, last_error)
-                if resp.status_code in (500, 502, 503, 504) and attempt < retries:
-                    await asyncio.sleep(1.5 * (attempt + 1))
+                if resp.status_code in (500, 502, 503, 504) and attempts <= retries:
+                    await asyncio.sleep(1.5 * attempts)
                     continue
                 return {"ok": False, "error": last_error, "provider": PROVIDER, "model": use_model}
 
@@ -201,12 +333,19 @@ async def generate(
                 ai_usage.record(PROVIDER, use_model, task, False, last_error)
                 return {"ok": False, "error": last_error, "provider": PROVIDER, "model": use_model}
             ai_usage.record(PROVIDER, use_model, task, True)
+            if not model:
+                # Gewaehltes Modell merken, damit der naechste Aufruf direkt
+                # das funktionierende Modell verwendet.
+                settings.set_runtime(
+                    "gemini_vision_model" if images else "gemini_text_model", use_model
+                )
             return {"ok": True, "text": text, "provider": PROVIDER, "model": use_model}
         except Exception as exc:  # noqa: BLE001 - Netzfehler sind erwartbar
             last_error = str(exc)
-            if attempt < retries:
-                await asyncio.sleep(1.5 * (attempt + 1))
+            if attempts <= retries:
+                await asyncio.sleep(1.5 * attempts)
                 continue
+            break
     ai_usage.record(PROVIDER, use_model, task, False, last_error)
     return {"ok": False, "error": last_error, "provider": PROVIDER, "model": use_model}
 
