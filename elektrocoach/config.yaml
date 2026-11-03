@@ -1,5 +1,5 @@
 name: "ElektroCoach"
-version: "1.0.6"
+version: "1.0.7"
 slug: "elektrocoach"
 description: "KI-Lernplattform für Elektroniker Energie- und Gebäudetechnik mit OCR-Import, Lernsystem, Prüfungssimulation und Schaltplan-Editor"
 url: "https://github.com/Dealwirth/ElektroCoach/tree/main/elektrocoach"
@@ -18,6 +18,10 @@ panel_icon: mdi:school
 panel_title: "ElektroCoach"
 panel_admin: false
 homeassistant_api: true
+# Supervisor-Zugriff, damit ElektroCoach das Ollama-Add-on finden, starten und
+# Modelle laden kann. Ohne hassio_api liefert /addons nur einen Fehler.
+hassio_api: true
+hassio_role: manager
 timeout: 30
 tmpfs: true
 ports:
@@ -32,7 +36,7 @@ options:
   gemini_text_model: "gemini-flash-latest"
   gemini_vision_model: "gemini-flash-latest"
   ollama_url: "http://localhost:11434"
-  ollama_model: "llama3.2:3b"
+  ollama_model: "llama3.2:1b"
   ollama_enabled: false
   ocr_languages: "deu+eng"
   ai_mode: "auto"

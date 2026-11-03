@@ -42,7 +42,7 @@ def base_url() -> str:
 
 
 def model() -> str:
-    return str(settings.get("ollama_model", "llama3.2:3b"))
+    return str(settings.get("ollama_model", "llama3.2:1b"))
 
 
 def is_enabled() -> bool:

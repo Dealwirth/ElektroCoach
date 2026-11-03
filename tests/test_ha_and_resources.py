@@ -67,6 +67,33 @@ def test_publish_ohne_mqtt_ist_fehlerfrei():
     ha_integration.remove_discovery()
 
 
+def test_discovery_namen_vermeiden_doppelten_geraetenamen(monkeypatch):
+    # Home Assistant stellt den Geraetenamen voran. Enthaelt "name" den
+    # Geraetenamen erneut, entsteht sensor.elektrocoach_elektrocoach_...
+    import json
+
+    captured: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        ha_integration, "_publish",
+        lambda topic, payload, retain=True: captured.append((topic, payload)) or True,
+    )
+    settings.set_runtime("mqtt_enabled", True)
+    try:
+        assert ha_integration.publish_discovery() is True
+    finally:
+        settings.set_runtime("mqtt_enabled", False)
+
+    configs = [
+        json.loads(payload) for topic, payload in captured
+        if topic.endswith("/config")
+    ]
+    assert configs
+    for payload in configs:
+        assert "ElektroCoach" not in payload["name"]
+        assert payload["object_id"] == payload["unique_id"]
+        assert payload["device"]["identifiers"] == [ha_integration.DEVICE_ID]
+
+
 def test_mqtt_publish_mit_ungueltigem_host_scheitert_sauber():
     settings.set_runtime("mqtt_enabled", True)
     settings.set_runtime("mqtt_host", "127.0.0.1")
