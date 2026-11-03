@@ -79,16 +79,28 @@ async def _request(
 
 
 async def _all_addons() -> list[dict[str, Any]]:
-    """Alle installierten Add-ons. Faellt auf die V2-Route zurueck."""
+    """Alle installierten Add-ons. Faellt auf die V2-Route zurueck.
+
+    Der Supervisor liefert je nach Version ein Objekt ``{"addons": [...]}``
+    oder direkt eine Liste. Beide Formen werden verarbeitet. Scheitern alle
+    Routen, wird der letzte Fehler weitergereicht, damit die Oberflaeche eine
+    Ursache statt eines stillen "nicht installiert" anzeigen kann.
+    """
+    last_error: SupervisorError | None = None
     for endpoint in ("/addons", "/apps"):
         try:
             data = await _request("GET", endpoint)
-        except SupervisorError:
+        except SupervisorError as exc:
+            last_error = exc
             continue
-        if isinstance(data, dict):
-            items = data.get("addons") or data.get("apps") or []
-            if items:
-                return list(items)
+        if isinstance(data, list):
+            items = data
+        else:
+            items = (data or {}).get("addons") or (data or {}).get("apps") or []
+        if items:
+            return list(items)
+    if last_error is not None:
+        raise last_error
     return []
 
 
@@ -319,4 +331,15 @@ async def status() -> dict[str, Any]:
         suggested = url_from_addon(addon)
         if suggested:
             result["suggested_url"] = suggested
+    else:
+        # Kein Ollama-Add-on erkannt: die tatsaechlich sichtbaren Add-ons
+        # mitliefern, damit die Ursache sichtbar ist (z. B. fehlende Rechte).
+        try:
+            seen = await _all_addons()
+            result["addons_seen"] = [
+                {"slug": a.get("slug"), "name": a.get("name"), "state": a.get("state")}
+                for a in seen
+            ]
+        except SupervisorError as exc:
+            result["error"] = str(exc)
     return result

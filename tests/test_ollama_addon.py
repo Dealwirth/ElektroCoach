@@ -141,6 +141,47 @@ def test_find_installed_erkennt_ollama(supervisor):
     assert addon["slug"] == "76e18fb5_ollama"
 
 
+def test_all_addons_verarbeitet_reine_liste(monkeypatch):
+    # Manche Supervisor-Versionen liefern eine Liste statt {"addons": [...]}.
+    server, url = _serve(_SupervisorHandler)
+    monkeypatch.setattr(ollama_addon, "SUPERVISOR_TOKEN", "t")
+    monkeypatch.setattr(ollama_addon, "SUPERVISOR_URL", url)
+
+    async def fake_request(method, endpoint, **kwargs):
+        if endpoint in ("/addons", "/apps"):
+            return [{"slug": "76e18fb5_ollama", "name": "Ollama", "state": "started"}]
+        raise ollama_addon.SupervisorError("unerwartet")
+
+    monkeypatch.setattr(ollama_addon, "_request", fake_request)
+    try:
+        addon = asyncio.run(ollama_addon.find_installed())
+        assert addon is not None
+        assert addon["slug"] == "76e18fb5_ollama"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_status_meldet_fehler_wenn_supervisor_ablehnt(monkeypatch):
+    # Ohne Supervisor-Zugriff liefert /addons einen Fehler. Statt eines
+    # stillen "nicht installiert" muss die Ursache sichtbar sein.
+    server, url = _serve(_SupervisorHandler)
+    monkeypatch.setattr(ollama_addon, "SUPERVISOR_TOKEN", "t")
+    monkeypatch.setattr(ollama_addon, "SUPERVISOR_URL", url)
+
+    async def fake_request(method, endpoint, **kwargs):
+        raise ollama_addon.SupervisorError("HTTP 403: Forbidden")
+
+    monkeypatch.setattr(ollama_addon, "_request", fake_request)
+    try:
+        result = asyncio.run(ollama_addon.status())
+        assert result["installed"] is False
+        assert "403" in result["error"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_status_meldet_installiert(supervisor):
     result = asyncio.run(ollama_addon.status())
     assert result["supervisor"] is True
