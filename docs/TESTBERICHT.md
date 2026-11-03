@@ -9,7 +9,7 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 
 | Punkt | Wert |
 | --- | --- |
-| Tests | 237 automatisierte Tests, 5 übersprungen |
+| Tests | 238 automatisierte Tests, 5 übersprungen |
 | Laufzeit | Python 3.13.15, FastAPI 0.119.1, Uvicorn 0.39.0 |
 | Bildverarbeitung | Pillow 11.3.0, pypdfium2 4.30.0 |
 | OCR | Tesseract mit `deu`, `eng`, `equ` |
@@ -19,7 +19,7 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 ## 1. Automatisierte Tests
 
 ```
-237 passed, 5 skipped
+238 passed, 5 skipped
 ```
 
 | Testdatei | Anzahl | Inhalt |
@@ -161,16 +161,18 @@ Diese Punkte wurden hier nicht oder nur teilweise geprüft:
 1. **Laufzeit auf ARM64.** Inzwischen auf einem echten Raspberry Pi 4 über den
    echten Ingress geprüft (Abschnitt 12). Der ARM64-Build ist erfolgreich.
 2. **Echtes Samsung-Notes-Export.** Nur mit synthetischem Behälter getestet.
-3. **Gemini-Live-Aufruf.** Ein Schlüssel ist im Add-on hinterlegt; ein
-   Live-Aufruf mit echter Antwort wurde noch nicht protokolliert.
+3. **Gemini-Live-Aufruf.** Erledigt: echte Anfrage mit fachlich korrekter
+   deutscher Antwort, Quellenverweis und Kennzeichnung `external: true`
+   (siehe Abschnitt 12).
 4. **Ollama-Live-Aufruf.** Ollama ist auf dem Pi noch nicht installiert.
 5. **MQTT-Sensoren in Home Assistant.** Ohne Broker nicht sichtbar. Auf dem Pi
    ist derzeit kein MQTT-Broker installiert (nur `govee2mqtt`, im Fehlerzustand).
 
 ## 12. Echter Raspberry Pi 4 und echter Home-Assistant-Ingress
 
-Add-on `b274c19d_elektrocoach`, Version **1.0.2**, Home Assistant OS auf
-Raspberry Pi 4 (8 GB), aarch64. Zugriff über den echten Ingress-Pfad.
+Add-on `b274c19d_elektrocoach`, Version **1.0.3**, Home Assistant OS auf
+Raspberry Pi 4 (8 GB), aarch64, Python 3.14.10. Zugriff über den echten
+Ingress-Pfad.
 
 | Prüfung | Ergebnis |
 | --- | --- |
@@ -193,6 +195,11 @@ Raspberry Pi 4 (8 GB), aarch64. Zugriff über den echten Ingress-Pfad.
 | Spaced Repetition | Frage nach Antwort neu geplant (fällig 2 → 1) |
 | Prüfungssimulation | Anlegen, Starten, Antworten, Abschluss, Vergleich erfolgreich |
 | Backup | Vorhanden (`automatisch`, 8,8 kB) |
+| Ressourcen | 4 Kerne, Last 0,51, freier Speicher 28 GB (47,9 %) |
+| KI-Status | Gemini verfügbar, Kontingent 3/450 genutzt; Ollama deaktiviert |
+| KI-Live-Anfrage (Gemini) | Erfolgreich: fachlich korrekte Antwort, Quellenverweis `[lerntest.png S.1]`, `external: true` |
+| Benachrichtigung sichtbar in HA | Bestätigt über `persistent_notification/get` |
+| Alle Kernendpunkte über Ingress | 200 (`/api/topics`, `/api/review/due`, `/api/plan`, `/api/progress`, `/api/questions`, `/api/documents`, `/api/storage`, `/api/system/info`, `/api/goals`, `/api/schematics/library`, `/api/backups`, `/api/ha/status`, `/api/search`, `/api/ai/status`) |
 
 ### Gefundene und behobene Fehler auf dem echten System
 
@@ -205,3 +212,7 @@ Raspberry Pi 4 (8 GB), aarch64. Zugriff über den echten Ingress-Pfad.
 2. **Versionsanzeige zeigte fest `1.0.0`.** Jetzt eine zentrale Konstante
    `app.__version__`; zusätzlich `build` und `supervisor_token` in `/api/health`
    zur schnellen Prüfung einer Installation.
+3. **`notify.send_message` ohne Empfänger** führte zu HTTP 400 mit
+   unverständlicher Meldung. Die Fehlermeldung erklärt jetzt die Ursache und
+   den Ausweg; Standardziel bleibt `persistent_notification.create`. Version
+   1.0.3 ausgeliefert und auf dem Pi geprüft.
