@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import sqlite3
 from pathlib import Path
 from typing import Any
 
@@ -42,8 +43,12 @@ def pages_dir() -> Path:
 # Duplikate
 # ---------------------------------------------------------------------------
 def find_duplicate(sha256: str) -> dict[str, Any] | None:
+    # Nur Dokumente mit echtem Inhalt zaehlen: eine leere Datei darf nicht zum
+    # "Duplikat" einer anderen leeren Datei werden.
     row = db.query_one(
-        "SELECT id, filename, created_at FROM documents WHERE sha256 = ?", (sha256,)
+        "SELECT id, filename, created_at FROM documents "
+        "WHERE sha256 = ? AND page_count > 0 AND status != 'error'",
+        (sha256,),
     )
     return dict(row) if row else None
 
@@ -105,13 +110,32 @@ def store_document(
     stored = documents_dir() / f"{doc_id}_{safe}"
     shutil.copy2(path, stored)
 
-    db.insert(
-        "INSERT INTO documents(id, filename, stored_path, mime, sha256, size_bytes, "
-        "source, collection, status, created_at, updated_at) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
-        (doc_id, safe, str(stored), _mime_for(safe), digest, stored.stat().st_size,
-         source, collection, "processing", db.now(), db.now()),
-    )
+    try:
+        db.insert(
+            "INSERT INTO documents(id, filename, stored_path, mime, sha256, size_bytes, "
+            "source, collection, status, created_at, updated_at) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            (doc_id, safe, str(stored), _mime_for(safe), digest, stored.stat().st_size,
+             source, collection, "processing", db.now(), db.now()),
+        )
+    except sqlite3.IntegrityError:
+        # Zwei Uploads derselben Datei koennen sich ueberholen. Dann gewinnt der
+        # erste; der zweite wird als Duplikat gemeldet statt einen Fehler zu werfen.
+        stored.unlink(missing_ok=True)
+        existing = find_duplicate(digest)
+        if existing:
+            return {
+                "id": existing["id"],
+                "status": "duplicate",
+                "filename": safe,
+                "pages": 0,
+                "chunks": 0,
+                "needs_review": False,
+                "kind": "duplicate",
+                "duplicate_of": existing["filename"],
+                "error": None,
+            }
+        raise
 
     try:
         result = process_file(stored)
@@ -157,10 +181,16 @@ def store_document(
         )
 
     status = "needs_review" if result.needs_review else "ready"
+    error: str | None = None
+    if result.meta.get("empty"):
+        # Inhaltlich leere Datei: sichtbar als Fehler, nicht als "fertig".
+        status = "error"
+        error = str(result.meta.get("error") or "Datei enthaelt keinen verwertbaren Inhalt")
     with db.write() as conn:
         conn.execute(
-            "UPDATE documents SET status=?, page_count=?, meta_json=?, updated_at=? WHERE id=?",
-            (status, len(result.pages), db.json_dumps_safe(result.meta), db.now(), doc_id),
+            "UPDATE documents SET status=?, page_count=?, meta_json=?, error=?, updated_at=? "
+            "WHERE id=?",
+            (status, len(result.pages), db.json_dumps_safe(result.meta), error, db.now(), doc_id),
         )
 
     return {
@@ -172,6 +202,7 @@ def store_document(
         "needs_review": result.needs_review,
         "kind": result.kind,
         "duplicate_of": None,
+        "error": error,
     }
 
 

@@ -11,6 +11,7 @@ Design:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import queue
@@ -59,20 +60,77 @@ def start_worker() -> None:
         log.info("Import-Worker gestartet.")
 
 
+def resume_interrupted_jobs() -> int:
+    """Setzt Auftraege fort, die ein Neustart unterbrochen hat.
+
+    Ein Abbruch mitten im Import (Neustart, Stromausfall) laesst einen Auftrag
+    sonst dauerhaft auf "running" stehen. Beim Start werden solche Auftraege
+    erneut eingereiht. Bereits importierte Dateien werden ueber die
+    SHA-256-Pruefung als Duplikate erkannt und uebersprungen, die Verarbeitung
+    ist dadurch wiederholbar.
+    """
+    try:
+        rows = db.query(
+            "SELECT id, status FROM import_jobs WHERE status IN ('running', 'queued')"
+        )
+    except Exception:  # noqa: BLE001 - darf den Start nicht verhindern
+        log.exception("Unterbrochene Importauftraege konnten nicht gelesen werden.")
+        return 0
+    resumed = 0
+    for row in rows:
+        job_id = row["id"]
+        data = job(job_id) or {}
+        try:
+            stats = json.loads(data.get("stats_json") or "{}")
+        except json.JSONDecodeError:
+            stats = {}
+        if not stats.get("files"):
+            _set_job(job_id, status="error",
+                     message="Import wurde durch einen Neustart unterbrochen")
+            continue
+        _set_job(job_id, status="queued", cancel_requested=0,
+                 message="Nach Neustart fortgesetzt")
+        if _dispatch(job_id):
+            resumed += 1
+    if resumed:
+        log.info("%s unterbrochene Importauftraege werden fortgesetzt.", resumed)
+    return resumed
+
+
+def _dispatch(job_id: str) -> bool:
+    """Reiht einen Auftrag ein. Ohne laufenden Worker wird dieser gestartet."""
+    start_worker()
+    _queue.put((job_id, []))
+    return True
+
+
 def enqueue_job(job_id: str, paths: list[str]) -> None:
     _queue.put((job_id, paths))
 
 
 def _run() -> None:
+    """Endlosschleife des Import-Workers.
+
+    Die Schleife darf nie sterben: faellt die Fehlerbehandlung selbst aus
+    (z. B. bei einem Datenbankproblem), wird der Auftrag trotzdem abgeschlossen
+    und der naechste Auftrag angenommen. Sonst waeren nach einem einzigen
+    Fehler dauerhaft keine Importe mehr moeglich.
+    """
     while True:
         job_id, paths = _queue.get()
         try:
             _process_job(job_id, paths)
         except Exception:  # noqa: BLE001
             log.exception("Import-Job %s fehlgeschlagen", job_id)
-            _set_job(job_id, status="error", message="Unerwarteter Fehler im Import")
+            try:
+                _set_job(job_id, status="error", message="Unerwarteter Fehler im Import")
+            except Exception:  # noqa: BLE001
+                log.exception("Fehlerstatus fuer Job %s konnte nicht gespeichert werden", job_id)
         finally:
-            _queue.task_done()
+            try:
+                _queue.task_done()
+            except Exception:  # noqa: BLE001
+                log.exception("task_done fuer Job %s fehlgeschlagen", job_id)
 
 
 def _set_job(job_id: str, **fields: Any) -> None:
@@ -120,32 +178,64 @@ def create_job(files: list[tuple[str, str]], collection: str | None = None) -> s
 
 
 def _unpack_archives(files: list[tuple[str, str]], job_id: str) -> list[tuple[str, str]]:
-    """Entpackt ZIPs (z. B. Samsung-Sammlungen), die keine Notes-Container sind."""
-    expanded: list[tuple[str, str]] = []
+    """Entpackt ZIPs (z. B. Samsung-Sammlungen), auch verschachtelt.
+
+    Schutzmechanismen:
+      * maximale Schachtelungstiefe (Standard 3)
+      * Obergrenze fuer die Gesamtzahl entpackter Dateien je Job
+      * Obergrenze fuer die entpackte Gesamtgroesse (ZIP-Bombe)
+    """
+    max_depth = max(1, settings.get_int("import_max_zip_depth", 3))
+    max_entries = max(100, settings.get_int("import_max_zip_entries", 5000))
+    max_unpacked = settings.get_int("import_max_unpacked_mb", 4096) * 1024 * 1024
+    max_member = settings.get_int("import_max_zip_member_mb", 128) * 1024 * 1024
+
     workdir = settings.data_dir / "import_tmp" / job_id
-    for path_str, name in files:
+    expanded: list[tuple[str, str]] = []
+    state = {"entries": 0, "bytes": 0}
+
+    def unpack_one(path_str: str, name: str, depth: int) -> None:
         path = Path(path_str)
         if path.suffix.lower() != ".zip" or not zipfile.is_zipfile(path):
             expanded.append((path_str, name))
-            continue
+            return
+        added = 0
         try:
             workdir.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(path) as archive:
-                count = 0
                 for info in archive.infolist():
-                    if info.is_dir() or count >= 1000:
+                    if info.is_dir() or state["entries"] >= max_entries:
                         continue
+                    if info.file_size > max_member:
+                        log.warning("Ueberspringe zu grosse Datei im Archiv: %s", info.filename)
+                        continue
+                    if state["bytes"] + info.file_size > max_unpacked:
+                        log.warning("Archiv %s ueberschreitet das Groessenlimit.", name)
+                        break
                     inner_name = safe_filename(info.filename)
                     if not is_allowed_upload(inner_name):
                         continue
-                    target = workdir / f"{count:04d}_{inner_name}"
+                    target = workdir / f"d{depth}_{state['entries']:05d}_{inner_name}"
                     with archive.open(info) as src, target.open("wb") as dst:
                         shutil.copyfileobj(src, dst, length=1 << 20)
-                    expanded.append((str(target), inner_name))
-                    count += 1
+                    state["entries"] += 1
+                    state["bytes"] += info.file_size
+                    added += 1
+                    if depth < max_depth and inner_name.lower().endswith(".zip"):
+                        unpack_one(str(target), inner_name, depth + 1)
+                    else:
+                        expanded.append((str(target), inner_name))
         except Exception as exc:  # noqa: BLE001
             log.warning("ZIP %s konnte nicht entpackt werden: %s", name, exc)
             expanded.append((path_str, name))
+            return
+        if added == 0:
+            # Leeres oder unbrauchbares Archiv: nicht stillschweigend verwerfen.
+            log.warning("Archiv %s enthaelt keine verwertbaren Dateien.", name)
+            expanded.append((path_str, name))
+
+    for path_str, name in files:
+        unpack_one(path_str, name, depth=0)
     return expanded
 
 
@@ -153,8 +243,6 @@ def _process_job(job_id: str, paths: list[str]) -> None:
     row = db.query_one("SELECT stats_json, total_files FROM import_jobs WHERE id = ?", (job_id,))
     stats = {}
     if row:
-        import json
-
         try:
             stats = json.loads(row["stats_json"] or "{}")
         except json.JSONDecodeError:
@@ -228,9 +316,12 @@ def _process_job(job_id: str, paths: list[str]) -> None:
 
         if outcome.get("status") == "error":
             failed += 1
+            results.append({"filename": name, "status": "error",
+                            "error": outcome.get("error") or "Verarbeitung fehlgeschlagen",
+                            "document_id": outcome.get("id")})
         else:
             processed += 1
-        results.append({"filename": name, **outcome})
+            results.append({"filename": name, **outcome})
         _set_job(job_id, processed_files=processed + skipped, failed_files=failed)
         time.sleep(INTER_FILE_DELAY)
 

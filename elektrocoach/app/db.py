@@ -16,7 +16,7 @@ from .config import settings
 
 log = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _local = threading.local()
 _write_lock = threading.RLock()
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS documents (
     filename    TEXT NOT NULL,
     stored_path TEXT NOT NULL,
     mime        TEXT,
-    sha256      TEXT UNIQUE,
+    sha256      TEXT,
     size_bytes  INTEGER NOT NULL DEFAULT 0,
     page_count  INTEGER NOT NULL DEFAULT 0,
     source      TEXT NOT NULL DEFAULT 'upload',
@@ -140,6 +140,13 @@ CREATE TABLE IF NOT EXISTS documents (
 );
 CREATE INDEX IF NOT EXISTS idx_documents_status ON documents(status);
 CREATE INDEX IF NOT EXISTS idx_documents_collection ON documents(collection);
+CREATE INDEX IF NOT EXISTS idx_documents_sha256 ON documents(sha256);
+
+-- Nur Dokumente mit echtem Inhalt sind "Duplikat-faehig". Leere oder
+-- fehlerhafte Dateien (0 Seiten) teilen sich haeufig denselben Hash und
+-- duerfen sich deshalb nicht gegenseitig blockieren.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_sha256_content
+    ON documents(sha256) WHERE page_count > 0 AND status != 'error';
 
 CREATE TABLE IF NOT EXISTS pages (
     id               TEXT PRIMARY KEY,
@@ -379,6 +386,7 @@ def init_db() -> None:
         if _initialised:
             return
         conn = get_conn()
+        _migrate_documents_sha256(conn)
         conn.executescript(SCHEMA_SQL)
         conn.execute(
             "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
@@ -388,6 +396,75 @@ def init_db() -> None:
         conn.commit()
         _initialised = True
         log.info("Datenbank bereit: %s", settings.db_path)
+
+
+def _migrate_documents_sha256(conn: sqlite3.Connection) -> None:
+    """Entfernt die alte UNIQUE-Bedingung auf documents.sha256.
+
+    Schema-Version 1 legte sha256 als UNIQUE-Spalte an. Dadurch konnte eine
+    zweite leere oder beschaedigte Datei nicht gespeichert werden (Absturz mit
+    IntegrityError). Ab Version 2 gilt die Eindeutigkeit nur noch fuer
+    Dokumente mit Inhalt (Teilindex).
+    """
+    try:
+        table = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='documents'"
+        ).fetchone()
+        if table is None:
+            return
+        ddl = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='documents'"
+        ).fetchone()
+        if ddl is None or "sha256" not in (ddl["sql"] or ""):
+            return
+        # Alte UNIQUE-Bedingung nur an der Spaltendefinition erkennen. Der
+        # Teilindex (Version 2) heisst anders und wird hier nicht beruehrt.
+        if not _has_column_unique(ddl["sql"], "sha256"):
+            return
+        log.info("Migriere documents-Tabelle: sha256 ohne globale UNIQUE-Bedingung.")
+        conn.execute("PRAGMA foreign_keys=OFF")
+        conn.executescript(
+            """
+            ALTER TABLE documents RENAME TO documents_old;
+            CREATE TABLE documents (
+                id          TEXT PRIMARY KEY,
+                filename    TEXT NOT NULL,
+                stored_path TEXT NOT NULL,
+                mime        TEXT,
+                sha256      TEXT,
+                size_bytes  INTEGER NOT NULL DEFAULT 0,
+                page_count  INTEGER NOT NULL DEFAULT 0,
+                source      TEXT NOT NULL DEFAULT 'upload',
+                collection  TEXT,
+                status      TEXT NOT NULL DEFAULT 'pending',
+                error       TEXT,
+                meta_json   TEXT NOT NULL DEFAULT '{}',
+                created_at  TEXT NOT NULL,
+                updated_at  TEXT NOT NULL
+            );
+            INSERT INTO documents SELECT * FROM documents_old;
+            DROP TABLE documents_old;
+            """
+        )
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.commit()
+    except sqlite3.Error as exc:  # pragma: no cover - nur bei defekten Altbestaenden
+        log.warning("Migration von documents.sha256 uebersprungen: %s", exc)
+
+
+def _has_column_unique(ddl: str, column: str) -> bool:
+    """Prueft, ob eine Spalte in der Tabellendefinition UNIQUE ist."""
+    import re
+
+    pattern = re.compile(
+        r"\b" + re.escape(column) + r"\b\s+[^,)]*?\bUNIQUE\b", re.IGNORECASE
+    )
+    if pattern.search(ddl):
+        return True
+    # Tabellenweite Bedingung: UNIQUE (..., sha256, ...)
+    return bool(
+        re.search(r"\bUNIQUE\s*\([^)]*\b" + re.escape(column) + r"\b[^)]*\)", ddl, re.IGNORECASE)
+    )
 
 
 # ---------------------------------------------------------------------------

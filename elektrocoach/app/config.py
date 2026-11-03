@@ -50,6 +50,11 @@ DEFAULTS: dict[str, Any] = {
     "keep_page_images": True,
     "import_max_parallel": 1,
     "import_memory_guard_mb": 400,
+    # Schutz vor entpackten Riesenarchiven (ZIP-Bomben).
+    "import_max_zip_depth": 3,
+    "import_max_zip_entries": 5000,
+    "import_max_zip_member_mb": 128,
+    "import_max_unpacked_mb": 4096,
     "dedupe_threshold": 0.92,
     # KI
     "ai_timeout_seconds": 60,

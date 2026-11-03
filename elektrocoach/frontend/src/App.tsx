@@ -59,6 +59,7 @@ function Icon({ path }: { path: string }) {
 export default function App() {
   const [online, setOnline] = useState<boolean | null>(null);
   const [aiWarning, setAiWarning] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -94,6 +95,11 @@ export default function App() {
 
   const isEditor = location.pathname.startsWith("/schaltplan/editor");
 
+  // Menü beim Seitenwechsel schließen, damit es nicht über dem Inhalt bleibt.
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
   return (
     <div className="flex min-h-screen bg-ink-50">
       {/* Seitenspalte ab Tablet */}
@@ -107,7 +113,7 @@ export default function App() {
             <p className="text-[11px] leading-tight text-ink-400">Energie & Gebäudetechnik</p>
           </div>
         </div>
-        <nav className="flex-1 space-y-0.5 px-3 pb-4">
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4 scrollbar-thin">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
@@ -138,9 +144,76 @@ export default function App() {
         </div>
       </aside>
 
+      {/* Ausklappmenü für Smartphone und Tablet: erreicht alle Bereiche. */}
+      {menuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-ink-900/40 md:hidden"
+          role="presentation"
+          onClick={() => setMenuOpen(false)}
+        >
+          <div
+            className="h-full w-[78%] max-w-xs overflow-y-auto bg-white shadow-lift scrollbar-thin"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-ink-100 px-4 py-4">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white">
+                  <Icon path="M13 2L4 14h6l-1 8 9-12h-6z" />
+                </span>
+                <div>
+                  <p className="text-sm font-bold leading-tight text-ink-900">ElektroCoach</p>
+                  <p className="text-[11px] leading-tight text-ink-400">Energie & Gebäudetechnik</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                aria-label="Navigation schließen"
+                onClick={() => setMenuOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <nav className="space-y-0.5 p-3">
+              {NAV.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/"}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors ${
+                      isActive
+                        ? "bg-brand-50 text-brand-700"
+                        : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"
+                    }`
+                  }
+                >
+                  <Icon path={item.icon} />
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+        </div>
+      )}
+
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Kopfzeile für Smartphone */}
-        <header className="flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 md:hidden">
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 md:hidden">
+          <button
+            type="button"
+            className="-ml-1 flex h-9 w-9 items-center justify-center rounded-lg text-ink-700 hover:bg-ink-100"
+            aria-label="Navigation öffnen"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(true)}
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="h-5 w-5" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
           <div className="flex items-center gap-2">
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-white">
               <Icon path="M13 2L4 14h6l-1 8 9-12h-6z" />

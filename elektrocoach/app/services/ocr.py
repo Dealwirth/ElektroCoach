@@ -202,10 +202,58 @@ def _render_pdf_pages(path: Path, max_pages: int, scale: float | None = None) ->
         return []
 
 
+def _empty_document_result(path: Path, kind: str, message: str) -> DocumentResult:
+    """Ergebnis fuer eine Datei, die technisch lesbar, aber inhaltlich leer ist."""
+    result = DocumentResult(kind=kind)
+    result.meta["error"] = message
+    result.meta["empty"] = True
+    page = PageResult(page_number=1, needs_review=True)
+    page.meta["error"] = message
+    result.pages.append(page)
+    result.needs_review = True
+    return result
+
+
 def process_pdf(path: Path, max_pages: int = 400, render_for_ocr: bool = True) -> DocumentResult:
     result = DocumentResult(kind="pdf")
     texts = _pdf_text_pages(path)
     result.meta["embedded_text_pages"] = sum(1 for t in texts if len(t.strip()) > MIN_TEXT_CHARS)
+
+    # Beschaedigte Dateien liefern keine Seiten. Das darf nicht als
+    # "fertig, 0 Seiten" durchgehen, sondern muss als Fehler sichtbar werden.
+    if not texts and path.stat().st_size == 0:
+        return _empty_document_result(path, "pdf", "Datei ist leer (0 Byte)")
+
+    if not texts and render_for_ocr:
+        # Reines Scan-PDF: pypdf findet keinen Text. Alle Seiten rendern und
+        # per OCR lesen, statt das Dokument mit 0 Seiten abzulegen.
+        images = _render_pdf_pages(path, max_pages)
+        if not images:
+            return _empty_document_result(
+                path, "pdf", "PDF ist beschaedigt oder hat keine lesbaren Seiten"
+            )
+        result.meta["scanned"] = True
+        for index, image in enumerate(images, start=1):
+            page = PageResult(page_number=index, image_bytes=image)
+            ocr = ocr_image_bytes(image)
+            if ocr["ok"] and ocr["text"]:
+                page.text = ocr["text"]
+                page.confidence = ocr["confidence"]
+                page.meta["ocr"] = "tesseract"
+            else:
+                page.meta["ocr_error"] = ocr.get("error")
+            if page.confidence is not None and page.confidence < REVIEW_CONFIDENCE:
+                page.needs_review = True
+            if not page.text.strip():
+                page.needs_review = True
+            result.pages.append(page)
+        result.needs_review = any(p.needs_review for p in result.pages)
+        return result
+
+    if not texts:
+        return _empty_document_result(
+            path, "pdf", "PDF ist beschaedigt oder hat keine lesbaren Seiten"
+        )
 
     need_ocr: list[int] = []
     for idx, text in enumerate(texts[:max_pages]):
@@ -266,6 +314,8 @@ def process_image(path: Path) -> DocumentResult:
 
 def process_text(path: Path) -> DocumentResult:
     text = path.read_text(encoding="utf-8", errors="replace")
+    if not text.strip():
+        return _empty_document_result(path, "text", "Textdatei ist leer")
     result = DocumentResult(kind="text")
     result.pages.append(PageResult(page_number=1, text=_clean_text(text)))
     return result

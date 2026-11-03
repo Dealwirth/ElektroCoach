@@ -58,6 +58,7 @@ async def lifespan(app: FastAPI):
     _load_stored_settings()
     learning.ensure_default_topics()
     import_worker.start_worker()
+    import_worker.resume_interrupted_jobs()
     ha_integration.start_scheduler()
     backup.maybe_auto_backup()
     log.info("ElektroCoach bereit. Datenverzeichnis: %s", settings.data_dir)
