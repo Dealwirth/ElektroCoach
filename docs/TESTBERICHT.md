@@ -214,6 +214,7 @@ Ingress-Pfad.
 | OCR (deutsches Tesseract auf dem Pi) | Text korrekt erkannt, Überschrift aus Frage abgeleitet |
 | Volltextsuche nach importiertem Text | Treffer mit Dokument- und Seitenbezug |
 | Dokument löschen | Erfolgreich, Bestand wieder 1 Dokument |
+| Benachrichtigung aus der Oberfläche | Testnachricht gesendet, in Home Assistant sichtbar (`persistent_notification/get`) |
 | Alle Kernendpunkte über Ingress | 200 (`/api/topics`, `/api/review/due`, `/api/plan`, `/api/progress`, `/api/questions`, `/api/documents`, `/api/storage`, `/api/system/info`, `/api/goals`, `/api/schematics/library`, `/api/backups`, `/api/ha/status`, `/api/search`, `/api/ai/status`) |
 
 ### Gefundene und behobene Fehler auf dem echten System
