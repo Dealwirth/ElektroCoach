@@ -199,6 +199,10 @@ Ingress-Pfad.
 | KI-Status | Gemini verfügbar, Kontingent 3/450 genutzt; Ollama deaktiviert |
 | KI-Live-Anfrage (Gemini) | Erfolgreich: fachlich korrekte Antwort, Quellenverweis `[lerntest.png S.1]`, `external: true` |
 | Benachrichtigung sichtbar in HA | Bestätigt über `persistent_notification/get` |
+| Import über Ingress (PNG) | Erfolgreich, Hintergrundjob `done`: 1 importiert, 0 Duplikate, 0 Fehler |
+| OCR (deutsches Tesseract auf dem Pi) | Text korrekt erkannt, Überschrift aus Frage abgeleitet |
+| Volltextsuche nach importiertem Text | Treffer mit Dokument- und Seitenbezug |
+| Dokument löschen | Erfolgreich, Bestand wieder 1 Dokument |
 | Alle Kernendpunkte über Ingress | 200 (`/api/topics`, `/api/review/due`, `/api/plan`, `/api/progress`, `/api/questions`, `/api/documents`, `/api/storage`, `/api/system/info`, `/api/goals`, `/api/schematics/library`, `/api/backups`, `/api/ha/status`, `/api/search`, `/api/ai/status`) |
 
 ### Gefundene und behobene Fehler auf dem echten System
