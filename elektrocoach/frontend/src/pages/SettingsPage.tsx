@@ -511,7 +511,7 @@ function HaSettings({ values, set, save, busy }: TabProps) {
               label="Benachrichtigungsdienst"
               value={String(values.ha_notify_service ?? "")}
               onChange={(value) => set("ha_notify_service", value)}
-              hint="Zum Beispiel notify.mobile_app_mein_handy. Leer lassen, um keine Nachrichten zu senden."
+              hint="Zum Beispiel notify.mobile_app_mein_handy. Leer lassen: dann erscheint die Meldung als dauerhafte Benachrichtigung in Home Assistant."
             />
             <NumberField
               id="notify_hour"
