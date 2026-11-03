@@ -56,6 +56,23 @@ def available() -> bool:
     return bool(SUPERVISOR_TOKEN)
 
 
+def unwrap(data: Any) -> Any:
+    """Der Supervisor verpackt jede Antwort in {"result": "ok", "data": ...}.
+
+    Ohne dieses Auspacken liest die Add-on-Erkennung immer eine leere Liste
+    und meldet faelschlich "nicht installiert". Bei Fehlern liefert der
+    Supervisor {"result": "error", "message": ...}; daraus wird ein
+    SupervisorError mit der Originalmeldung.
+    """
+    if isinstance(data, dict) and "result" in data:
+        if data.get("result") == "error":
+            message = data.get("message") or "Unbekannter Supervisor-Fehler"
+            raise SupervisorError(str(message))
+        if "data" in data:
+            return data["data"]
+    return data
+
+
 async def _request(
     method: str,
     endpoint: str,
@@ -73,7 +90,7 @@ async def _request(
     if not resp.content:
         return None
     try:
-        return resp.json()
+        return unwrap(resp.json())
     except ValueError:
         return {"raw": resp.text[:500]}
 
