@@ -88,6 +88,39 @@ def test_benachrichtigung_ohne_dienst_nutzt_standardziel():
     assert row is not None
 
 
+def test_benachrichtigung_notify_ohne_ziel_erklaert_fehler():
+    # Ein konfiguriertes 'notify.*' ohne Empfaenger wird von HA abgelehnt.
+    # Die Meldung muss verstaendlich auf die Ursache hinweisen.
+    import asyncio
+
+    class _FakeResponse:
+        status_code = 400
+        text = "400: Bad Request"
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, headers=None, json=None):
+            return _FakeResponse()
+
+    original_token = ha_integration.SUPERVISOR_TOKEN
+    ha_integration.SUPERVISOR_TOKEN = "test-token"
+    import httpx
+    original_client = httpx.AsyncClient
+    httpx.AsyncClient = lambda *a, **k: _FakeClient()
+    try:
+        result = asyncio.run(ha_integration.notify("Titel", "Text", "notify.send_message"))
+        assert result["ok"] is False
+        assert "Ziel" in result["error"] and "leer" in result["error"]
+    finally:
+        httpx.AsyncClient = original_client
+        ha_integration.SUPERVISOR_TOKEN = original_token
+
+
 def test_benachrichtigung_ziel_wird_zerlegt():
     import asyncio
     captured = {}
