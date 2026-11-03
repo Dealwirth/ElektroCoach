@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .. import db
+from .. import __version__, db
 from ..config import settings
 from ..security import safe_filename
 from ..workers import import_worker
@@ -59,7 +59,7 @@ def create_backup(label: str = "manuell", include_documents: bool = True) -> dic
     manifest = {
         "created_at": db.now(),
         "label": label,
-        "app_version": "1.0.0",
+        "app_version": __version__,
         "db_stats": db.db_stats(),
         "include_documents": include_documents,
     }

@@ -1,5 +1,5 @@
 name: "ElektroCoach"
-version: "1.0.1"
+version: "1.0.2"
 slug: "elektrocoach"
 description: "KI-Lernplattform für Elektroniker Energie- und Gebäudetechnik mit OCR-Import, Lernsystem, Prüfungssimulation und Schaltplan-Editor"
 url: "https://github.com/Dealwirth/ElektroCoach/tree/main/elektrocoach"

@@ -22,7 +22,8 @@ ENV LANG=C.UTF-8 \
     ELEKTROCOACH_PORT=8099 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    ELEKTROCOACH_BUILD="1.0.2"
 
 RUN apk add --no-cache \
         python3 \
@@ -56,7 +57,7 @@ LABEL \
     io.hass.name="ElektroCoach" \
     io.hass.description="KI-Lernplattform für Elektroniker Energie- und Gebäudetechnik" \
     io.hass.type="app" \
-    io.hass.version="1.0.1" \
+    io.hass.version="1.0.2" \
     io.hass.arch="aarch64|amd64"
 
 CMD [ "/run.sh" ]

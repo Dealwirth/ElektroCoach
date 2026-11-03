@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from .. import db
+from .. import __version__, db
 from ..config import SECRET_KEYS, settings
 from ..security import decrypt, encrypt
 from ..services import ai_router, backup, ha_integration, learning, schematic
@@ -32,10 +32,12 @@ class SettingsUpdate(BaseModel):
 async def health() -> dict[str, Any]:
     return {
         "status": "ok",
-        "version": "1.0.0",
+        "version": __version__,
+        "build": os.environ.get("ELEKTROCOACH_BUILD", "unbekannt"),
         "uptime_seconds": int(time.time() - _START_TIME),
         "db": db.integrity_check(),
         "worker_alive": import_worker.worker_alive(),
+        "supervisor_token": bool(os.environ.get("SUPERVISOR_TOKEN")),
     }
 
 
@@ -43,7 +45,7 @@ async def health() -> dict[str, Any]:
 async def system_info() -> dict[str, Any]:
     ai = await ai_router.status()
     return {
-        "version": "1.0.0",
+        "version": __version__,
         "python": platform.python_version(),
         "platform": platform.platform(),
         "machine": platform.machine(),

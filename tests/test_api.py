@@ -12,6 +12,8 @@ import zipfile
 
 from PIL import Image, ImageDraw
 
+from app import __version__
+
 
 def _png_bytes(text: str = "Leitungsschutzschalter 16 A") -> bytes:
     image = Image.new("L", (800, 200), color=255)
@@ -34,7 +36,7 @@ def test_ping(client):
 
 def test_system_info(client):
     data = client.get("/api/system/info").json()
-    assert data["version"] == "1.0.0"
+    assert data["version"] == __version__
     assert "storage" in data
     assert "ai" in data
     assert "ha" in data
