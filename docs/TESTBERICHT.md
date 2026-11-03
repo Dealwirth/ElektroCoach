@@ -195,6 +195,12 @@ Ingress-Pfad.
 | Spaced Repetition | Frage nach Antwort neu geplant (fällig 2 → 1) |
 | Prüfungssimulation | Anlegen, Starten, Antworten, Abschluss, Vergleich erfolgreich |
 | Backup | Vorhanden (`automatisch`, 8,8 kB) |
+| Backup anlegen | Erfolgreich (`livetest`) |
+| Wiederherstellung | Erfolgreich, Sicherheitskopie `vor-wiederherstellung-*.db` angelegt |
+| Daten nach Wiederherstellung | Dokumente 1, Fragen 3, Schaltpläne 2 — vollständig |
+| Add-on-Neustart über Supervisor | Erfolgreich, `state: started`, Version 1.0.3 |
+| Daten nach Neustart | Erhalten (Dokumente, Fragen, Schaltpläne) |
+| `SUPERVISOR_TOKEN` nach Neustart | Weiterhin vorhanden; Scheduler läuft wieder |
 | Ressourcen | 4 Kerne, Last 0,51, freier Speicher 28 GB (47,9 %) |
 | KI-Status | Gemini verfügbar, Kontingent 3/450 genutzt; Ollama deaktiviert |
 | KI-Live-Anfrage (Gemini) | Erfolgreich: fachlich korrekte Antwort, Quellenverweis `[lerntest.png S.1]`, `external: true` |
