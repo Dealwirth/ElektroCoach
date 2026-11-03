@@ -183,6 +183,32 @@ def snap(value: float, grid: int = GRID) -> float:
     return round(value / grid) * grid
 
 
+def _as_point(value: Any) -> dict[str, float] | None:
+    """Akzeptiert {"x": .., "y": ..} oder [x, y] und liefert immer {"x", "y"}."""
+    if isinstance(value, dict):
+        try:
+            return {"x": float(value.get("x", 0)), "y": float(value.get("y", 0))}
+        except (TypeError, ValueError):
+            return None
+    if isinstance(value, (list, tuple)) and len(value) >= 2:
+        try:
+            return {"x": float(value[0]), "y": float(value[1])}
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def normalise_points(points: Any) -> list[dict[str, float]]:
+    if not isinstance(points, (list, tuple)):
+        return []
+    result = []
+    for point in points:
+        normalised = _as_point(point)
+        if normalised is not None:
+            result.append(normalised)
+    return result
+
+
 def rotate_point(x: float, y: float, rotation: int, width: float, height: float) -> tuple[float, float]:
     """Dreht einen lokalen Punkt um 0/90/180/270 Grad innerhalb der Bauteilbox."""
     rotation = int(rotation or 0) % 360
@@ -241,9 +267,9 @@ def validate_design(data: dict[str, Any]) -> dict[str, Any]:
     werden gegen die tatsaechliche Pin-Geometrie geprueft, nicht gegen die
     gespeicherten Koordinaten - so werden auch verschobene Bauteile erkannt.
     """
-    components = data.get("components") or []
-    wires = data.get("wires") or []
-    junctions = data.get("junctions") or []
+    components = [c for c in (data.get("components") or []) if isinstance(c, dict)]
+    wires = [w for w in (data.get("wires") or []) if isinstance(w, dict)]
+    junctions = [j for j in (data.get("junctions") or []) if isinstance(j, dict)]
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -348,8 +374,9 @@ def connected_groups(data: dict[str, Any]) -> list[list[str]]:
 
 
 def wire_length(points: list[dict[str, float]]) -> float:
+    pts = normalise_points(points)
     total = 0.0
-    for a, b in zip(points, points[1:]):
+    for a, b in zip(pts, pts[1:]):
         total += math.hypot(float(b["x"]) - float(a["x"]), float(b["y"]) - float(a["y"]))
     return round(total, 2)
 
@@ -437,11 +464,23 @@ def save_project(project_id: str, name: str | None = None,
     if data is not None:
         # Bauteile auf das Raster einrasten, bevor gespeichert wird.
         for component in data.get("components") or []:
-            component["x"] = snap(float(component.get("x", 0)))
-            component["y"] = snap(float(component.get("y", 0)))
+            if not isinstance(component, dict):
+                continue
+            component["x"] = snap(float(component.get("x", 0) or 0))
+            component["y"] = snap(float(component.get("y", 0) or 0))
         for junction in data.get("junctions") or []:
-            junction["x"] = snap(float(junction.get("x", 0)))
-            junction["y"] = snap(float(junction.get("y", 0)))
+            if not isinstance(junction, dict):
+                continue
+            junction["x"] = snap(float(junction.get("x", 0) or 0))
+            junction["y"] = snap(float(junction.get("y", 0) or 0))
+        # Leitungs-Zwischenpunkte vereinheitlichen und einrasten.
+        for wire in data.get("wires") or []:
+            if not isinstance(wire, dict):
+                continue
+            wire["points"] = [
+                {"x": snap(p["x"]), "y": snap(p["y"])}
+                for p in normalise_points(wire.get("points"))
+            ]
         updates["data_json"] = db.json_dumps_safe(data)
     columns = ", ".join(f"{k} = ?" for k in updates)
     db.execute(
@@ -484,9 +523,9 @@ def project_svg(project_id: str) -> str | None:
         xs.extend([float(component.get("x", 0)), float(component.get("x", 0)) + width])
         ys.extend([float(component.get("y", 0)), float(component.get("y", 0)) + height])
     for wire in wires:
-        for point in wire.get("points") or []:
-            xs.append(float(point.get("x", 0)))
-            ys.append(float(point.get("y", 0)))
+        for point in normalise_points(wire.get("points")):
+            xs.append(point["x"])
+            ys.append(point["y"])
 
     margin = 60
     min_x, max_x = min(xs) - margin, max(xs) + margin
@@ -513,11 +552,11 @@ def project_svg(project_id: str) -> str | None:
     parts.append("</g>")
 
     for wire in wires:
-        points = wire.get("points") or []
+        points = normalise_points(wire.get("points"))
         if len(points) < 2:
             continue
         path = " ".join(
-            f"{'M' if i == 0 else 'L'}{float(p['x']):.0f} {float(p['y']):.0f}"
+            f"{'M' if i == 0 else 'L'}{p['x']:.0f} {p['y']:.0f}"
             for i, p in enumerate(points)
         )
         color = wire.get("color") or "#1e293b"
