@@ -1,0 +1,66 @@
+name: "ElektroCoach"
+version: "1.0.0"
+slug: "elektrocoach"
+description: "KI-Lernplattform für Elektroniker Energie- und Gebäudetechnik mit OCR-Import, Lernsystem, Prüfungssimulation und Schaltplan-Editor"
+url: "https://github.com/Dealwirth/ElektroCoach/tree/main/elektrocoach"
+arch:
+  - aarch64
+  - amd64
+init: false
+stage: stable
+startup: application
+boot: auto
+homeassistant: "2024.1.0"
+ingress: true
+ingress_port: 8099
+ingress_stream: true
+panel_icon: mdi:school
+panel_title: "ElektroCoach"
+panel_admin: false
+timeout: 30
+tmpfs: true
+ports:
+  8099/tcp: null
+ports_description:
+  8099/tcp: "Weboberfläche (nur nötig, wenn Ingress nicht verwendet wird)"
+map:
+  - share:rw
+  - media:ro
+options:
+  gemini_api_key: ""
+  gemini_text_model: "gemini-2.5-flash"
+  gemini_vision_model: "gemini-2.5-flash"
+  ollama_url: "http://localhost:11434"
+  ollama_model: "llama3.2:3b"
+  ollama_enabled: false
+  ocr_languages: "deu+eng"
+  ai_mode: "auto"
+  ha_notify_service: ""
+  mqtt_enabled: false
+  mqtt_host: "core-mosquitto"
+  mqtt_port: 1883
+  mqtt_username: ""
+  mqtt_password: ""
+  mqtt_discovery_prefix: "homeassistant"
+  daily_study_minutes: 45
+  sensor_update_interval: 300
+  log_level: "info"
+schema:
+  gemini_api_key: "password?"
+  gemini_text_model: "str"
+  gemini_vision_model: "str"
+  ollama_url: "str"
+  ollama_model: "str"
+  ollama_enabled: "bool"
+  ocr_languages: "str"
+  ai_mode: "list(auto|local_only|cloud_only|off)"
+  ha_notify_service: "str?"
+  mqtt_enabled: "bool"
+  mqtt_host: "str?"
+  mqtt_port: "port?"
+  mqtt_username: "str?"
+  mqtt_password: "password?"
+  mqtt_discovery_prefix: "str?"
+  daily_study_minutes: "int(5,600)"
+  sensor_update_interval: "int(30,3600)"
+  log_level: "list(debug|info|warning|error)"

@@ -1,0 +1,49 @@
+configuration:
+  gemini_api_key:
+    name: "Google Gemini API-Schlüssel"
+    description: "Kostenloser API-Schlüssel aus Google AI Studio (aistudio.google.com). Wird verschlüsselt im Add-on-Speicher abgelegt und nie an das Frontend gesendet."
+  gemini_text_model:
+    name: "Gemini Textmodell"
+    description: "Modell für Textaufgaben. Im kostenlosen Kontingent verfügbar: gemini-2.5-flash oder gemini-2.5-flash-lite."
+  gemini_vision_model:
+    name: "Gemini Bildmodell"
+    description: "Modell für OCR, Handschrift- und Schaltplananalyse (Vision)."
+  ollama_url:
+    name: "Ollama-URL"
+    description: "Adresse des Ollama-Servers, z. B. http://homeassistant.local:11434."
+  ollama_model:
+    name: "Ollama-Modell"
+    description: "Lokales Modell. Für den Raspberry Pi 4 (8 GB) empfohlen: llama3.2:3b, qwen2.5:3b oder phi4-mini."
+  ollama_enabled:
+    name: "Ollama aktivieren"
+    description: "Lokale KI für einfache Aufgaben verwenden."
+  ocr_languages:
+    name: "OCR-Sprachen"
+    description: "Tesseract-Sprachpakete, z. B. deu+eng."
+  ai_mode:
+    name: "KI-Modus"
+    description: "auto = lokal zuerst, Cloud nur wenn nötig; local_only; cloud_only; off."
+  ha_notify_service:
+    name: "Benachrichtigungsdienst"
+    description: "Optionaler notify-Dienst, z. B. notify.mobile_app_mein_handy."
+  mqtt_enabled:
+    name: "MQTT aktivieren"
+    description: "Sensoren per MQTT-Discovery in Home Assistant anlegen."
+  mqtt_host:
+    name: "MQTT-Host"
+    description: "MQTT-Broker, Standard ist der Home-Assistant-Broker core-mosquitto."
+  mqtt_port:
+    name: "MQTT-Port"
+  mqtt_username:
+    name: "MQTT-Benutzer"
+  mqtt_password:
+    name: "MQTT-Passwort"
+  mqtt_discovery_prefix:
+    name: "MQTT-Discovery-Präfix"
+  daily_study_minutes:
+    name: "Tägliches Lernziel (Minuten)"
+  sensor_update_interval:
+    name: "Sensor-Aktualisierungsintervall (Sekunden)"
+    description: "Wie oft Home-Assistant-Sensoren aktualisiert werden. Höhere Werte schonen den Event-Bus."
+  log_level:
+    name: "Protokollstufe"
