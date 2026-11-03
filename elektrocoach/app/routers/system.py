@@ -167,6 +167,14 @@ async def restore_backup(payload: RestoreRequest) -> dict[str, Any]:
     return result
 
 
+@router.get("/system/supervisor")
+async def supervisor_diagnostics() -> dict[str, Any]:
+    """Diagnose des Supervisor-Zugriffs (Rechte, Token, Add-on-Liste)."""
+    from ..services import supervisor_diag
+
+    return await supervisor_diag.diagnostics()
+
+
 @router.get("/storage")
 async def storage() -> dict[str, Any]:
     return backup.storage_report()
