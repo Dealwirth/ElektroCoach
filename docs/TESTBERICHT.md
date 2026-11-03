@@ -1,23 +1,25 @@
 # Testbericht
 
 Stand: 2026-11-03. Alle Angaben wurden in dieser Umgebung tatsächlich geprüft,
-sofern nicht ausdrücklich anders vermerkt.
+sofern nicht ausdrücklich anders vermerkt. Zusätzlich wurde das Add-on auf einem
+echten Raspberry Pi 4 (8 GB, Home Assistant OS, aarch64) installiert und über
+den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 
 ## Umgebung
 
 | Punkt | Wert |
 | --- | --- |
-| Tests | 217 automatisierte Tests, alle erfolgreich |
+| Tests | 237 automatisierte Tests, 5 übersprungen |
 | Laufzeit | Python 3.13.15, FastAPI 0.119.1, Uvicorn 0.39.0 |
 | Bildverarbeitung | Pillow 11.3.0, pypdfium2 4.30.0 |
 | OCR | Tesseract mit `deu`, `eng`, `equ` |
 | Container | Docker-Image gebaut aus `elektrocoach/Dockerfile`, gestartet, getestet |
-| Architektur der Testmaschine | x86_64 (siehe Einschränkungen für ARM64) |
+| Architektur der Testmaschine | x86_64 und **arm64 (echter Pi, siehe Abschnitt 12)** |
 
 ## 1. Automatisierte Tests
 
 ```
-217 passed in 11.84s
+237 passed, 5 skipped
 ```
 
 | Testdatei | Anzahl | Inhalt |
@@ -156,11 +158,50 @@ nachgebildeten Antworten abgedeckt.
 
 Diese Punkte wurden hier nicht oder nur teilweise geprüft:
 
-1. **Laufzeit auf ARM64.** Das Image ist für arm64 verfügbar, aber in dieser
-   Umgebung wurde nur die x86_64-Variante gebaut und gestartet. Der erste
-   Add-on-Build auf dem Pi muss noch erfolgen.
+1. **Laufzeit auf ARM64.** Inzwischen auf einem echten Raspberry Pi 4 über den
+   echten Ingress geprüft (Abschnitt 12). Der ARM64-Build ist erfolgreich.
 2. **Echtes Samsung-Notes-Export.** Nur mit synthetischem Behälter getestet.
-3. **Gemini-Live-Aufruf.** Ohne Schlüssel nicht möglich.
-4. **Ollama-Live-Aufruf.** Kein Ollama-Server in dieser Umgebung.
-5. **MQTT-Sensoren in Home Assistant.** Ohne Broker nicht sichtbar.
-6. **Echter Home-Assistant-Ingress.** Über nachgebildeten Proxy getestet.
+3. **Gemini-Live-Aufruf.** Ein Schlüssel ist im Add-on hinterlegt; ein
+   Live-Aufruf mit echter Antwort wurde noch nicht protokolliert.
+4. **Ollama-Live-Aufruf.** Ollama ist auf dem Pi noch nicht installiert.
+5. **MQTT-Sensoren in Home Assistant.** Ohne Broker nicht sichtbar. Auf dem Pi
+   ist derzeit kein MQTT-Broker installiert (nur `govee2mqtt`, im Fehlerzustand).
+
+## 12. Echter Raspberry Pi 4 und echter Home-Assistant-Ingress
+
+Add-on `b274c19d_elektrocoach`, Version **1.0.2**, Home Assistant OS auf
+Raspberry Pi 4 (8 GB), aarch64. Zugriff über den echten Ingress-Pfad.
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Add-on-Build (arm64) | Erfolgreich, Add-on startet |
+| `/api/health` | `status ok`, `build 1.0.2`, Datenbank ok, Import-Worker aktiv |
+| `SUPERVISOR_TOKEN` | **Verfügbar** (`supervisor_token: true`) |
+| Benachrichtigung (Standardziel) | Erfolgreich: `persistent_notification.create` |
+| Benachrichtigung fälliger Wiederholungen | Erfolgreich |
+| HA-Status | Token vorhanden, Scheduler läuft, Sensorwerte vorhanden |
+| Sensordaten | Fortschritt 13 %, Lernzeit, 1 fällige Wiederholung, Fragen, Trefferquote, freier Speicher 29 GB |
+| Oberfläche über Ingress | 200, `index.html` lädt, Basis-Pfad zur Laufzeit gesetzt |
+| Oberflächendateien | `assets/index-*.js` 200 (155 kB) |
+| API über Ingress | 200 |
+| Schaltplan: Projekt speichern (Punkte als Arrays) | Erfolgreich, Punkte normalisiert (echter Bugfix geprüft) |
+| Schaltplan-Bibliothek | 24 Symbole in 15 Kategorien |
+| Import-Formate | Samsung-Notes-Container als „best effort“ gemeldet, PDF empfohlen |
+| Volltextsuche | Treffer mit Dokument-, Seiten- und Textbezug |
+| Fällige Wiederholungen | 2 Fragen fällig, Lernplan berechnet |
+| Frage beantworten | Bewertung mit Teilpunkten, Feedback, Rechenweg, Quellen |
+| Spaced Repetition | Frage nach Antwort neu geplant (fällig 2 → 1) |
+| Prüfungssimulation | Anlegen, Starten, Antworten, Abschluss, Vergleich erfolgreich |
+| Backup | Vorhanden (`automatisch`, 8,8 kB) |
+
+### Gefundene und behobene Fehler auf dem echten System
+
+1. **`SUPERVISOR_TOKEN` war immer leer** (Home Assistant konnte nicht
+   benachrichtigt werden), obwohl `homeassistant_api: true` gesetzt war. Ursache:
+   Die Home-Assistant-Basis nutzt s6-overlay; ein Startskript mit
+   `#!/usr/bin/env bash` erbt die Container-Umgebungsvariablen nicht. Behoben
+   durch `#!/command/with-contenv bash` in `run.sh`. Erst danach meldete
+   `/api/health` `supervisor_token: true` und Benachrichtigungen funktionierten.
+2. **Versionsanzeige zeigte fest `1.0.0`.** Jetzt eine zentrale Konstante
+   `app.__version__`; zusätzlich `build` und `supervisor_token` in `/api/health`
+   zur schnellen Prüfung einer Installation.
