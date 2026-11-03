@@ -20,6 +20,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import db
+from . import __version__
 from .config import settings
 from .routers import ai_api, exams, imports, learning_api, schematics, system
 from .services import backup, ha_integration, learning
@@ -91,7 +92,7 @@ def _load_stored_settings() -> None:
 
 app = FastAPI(
     title="ElektroCoach",
-    version="1.0.0",
+    version=__version__,
     description=(
         "KI-Lernplattform fuer die Abschlusspruefung Elektroniker fuer Energie- "
         "und Gebaeudetechnik mit OCR-Import, Lernsystem, Pruefungssimulation "

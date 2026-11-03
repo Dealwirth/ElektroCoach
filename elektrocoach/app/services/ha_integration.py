@@ -29,7 +29,7 @@ from typing import Any
 
 import httpx
 
-from .. import db
+from .. import __version__, db
 from ..config import SUPERVISOR_TOKEN, SUPERVISOR_URL, settings
 from ..security import decrypt
 from . import learning
@@ -199,7 +199,7 @@ def publish_discovery() -> bool:
                 "name": DEVICE_NAME,
                 "manufacturer": "ElektroCoach",
                 "model": "KI-Lernplattform",
-                "sw_version": "1.0.0",
+                "sw_version": __version__,
             },
         }
         if sensor.get("unit"):
