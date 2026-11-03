@@ -79,6 +79,20 @@ Kontingent). Ziel: Raspberry Pi 4, 8 GB, Home Assistant OS, aarch64.
 8. **Schaltplan-Leitungen und Zeiger.** Beim Ziehen einer Leitung den Zeiger
    einfangen (`setPointerCapture`). Sonst beendet `onPointerLeave` das Ziehen,
    bevor der Zielanschluss erreicht ist.
+9. **Ollama-Add-on-Verwaltung braucht `hassio_api`.** Mit nur
+   `homeassistant_api: true` liefert `GET /addons` am Supervisor einen Fehler;
+   die Oberfläche meldet dann fälschlich „nicht installiert", obwohl das
+   Ollama-Add-on läuft. In `config.yaml` `hassio_api: true` und
+   `hassio_role: manager` setzen. Nach Änderung der Berechtigungen genügt ein
+   Neustart des Add-ons, kein Neu-Build.
+10. **MQTT-Entity-Namen.** `name` im Discovery-Payload darf den Gerätenamen
+    nicht erneut enthalten, sonst entsteht `sensor.elektrocoach_elektrocoach_…`.
+    `name` = Sensorname, `object_id` = `unique_id` = Geräteslug + Sensorkey.
+    Bereits registrierte Entitäten behalten ihre alte ID; einmalig über
+    `config/entity_registry/update` umbenennen.
+11. **`OLLAMA_FLASH_ATTENTION=1` bei quantisiertem KV-Cache.** Ist
+    `OLLAMA_KV_CACHE_TYPE=q8_0` gesetzt und Flash-Attention aus, antwortet das
+    Ollama-Add-on auf jede Anfrage mit HTTP 500.
 
 ## Git
 
