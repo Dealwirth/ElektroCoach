@@ -79,18 +79,26 @@ Kontingent). Ziel: Raspberry Pi 4, 8 GB, Home Assistant OS, aarch64.
 8. **Schaltplan-Leitungen und Zeiger.** Beim Ziehen einer Leitung den Zeiger
    einfangen (`setPointerCapture`). Sonst beendet `onPointerLeave` das Ziehen,
    bevor der Zielanschluss erreicht ist.
-9. **Ollama-Add-on-Verwaltung braucht `hassio_api`.** Mit nur
-   `homeassistant_api: true` liefert `GET /addons` am Supervisor einen Fehler;
-   die Oberfläche meldet dann fälschlich „nicht installiert", obwohl das
-   Ollama-Add-on läuft. In `config.yaml` `hassio_api: true` und
+9. **Supervisor-Antworten sind Umschläge.** Der Supervisor liefert jede
+   erfolgreiche Antwort als `{"result": "ok", "data": {...}}`, Fehler als
+   `{"result": "error", "message": ...}`. Wer die Schlüssel auf der obersten
+   Ebene liest (z. B. `data["addons"]`), bekommt immer eine leere Liste und
+   meldet fälschlich „nicht installiert", obwohl das Add-on läuft. Antwort
+   immer über `ollama_addon.unwrap()` bzw. `_request()` auspacken.
+10. **Ollama-Add-on-Verwaltung braucht `hassio_api`.** Mit nur
+   `homeassistant_api: true` verweigert der Supervisor den Zugriff auf
+   `/addons` (403). In `config.yaml` `hassio_api: true` und
    `hassio_role: manager` setzen. Nach Änderung der Berechtigungen genügt ein
    Neustart des Add-ons, kein Neu-Build.
-10. **MQTT-Entity-Namen.** `name` im Discovery-Payload darf den Gerätenamen
+11. **Diagnose des Supervisor-Zugriffs.** `GET /api/system/supervisor` zeigt
+   Token-Status, Rechte und die Ergebnisse der einzelnen Supervisor-Routen in
+   einem Aufruf. Bei „Ollama nicht installiert" zuerst diesen Endpunkt prüfen.
+12. **MQTT-Entity-Namen.** `name` im Discovery-Payload darf den Gerätenamen
     nicht erneut enthalten, sonst entsteht `sensor.elektrocoach_elektrocoach_…`.
     `name` = Sensorname, `object_id` = `unique_id` = Geräteslug + Sensorkey.
     Bereits registrierte Entitäten behalten ihre alte ID; einmalig über
     `config/entity_registry/update` umbenennen.
-11. **`OLLAMA_FLASH_ATTENTION=1` bei quantisiertem KV-Cache.** Ist
+13. **`OLLAMA_FLASH_ATTENTION=1` bei quantisiertem KV-Cache.** Ist
     `OLLAMA_KV_CACHE_TYPE=q8_0` gesetzt und Flash-Attention aus, antwortet das
     Ollama-Add-on auf jede Anfrage mit HTTP 500.
 
