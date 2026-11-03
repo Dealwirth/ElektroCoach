@@ -55,6 +55,17 @@ Kontingent). Ziel: Raspberry Pi 4, 8 GB, Home Assistant OS, aarch64.
 4. **`notify.*` braucht ein Ziel.** Ein konfiguriertes `notify.send_message`
    ohne Empfänger lehnt Home Assistant mit HTTP 400 ab. Standard ist
    `persistent_notification.create` (Feld leer lassen).
+5. **Gemini-Modelle sind zeitweise überlastet.** `gemini-flash-latest`
+   antwortet sporadisch mit HTTP 503 („high demand"). `gemini.py` sortiert ein
+   solches Modell 120 s lang als `degraded` nach hinten und wechselt bei einer
+   Zeitüberschreitung sofort auf das nächste Modell. Das erfolgreich genutzte
+   Modell wird in den Einstellungen gemerkt. Ohne diesen Mechanismus kostet
+   jede Anfrage erneut bis zu 180 s (Lesezeitlimit).
+6. **`/store/reload` kann mit leerem Fehler scheitern.** Dann das Repository
+   erneut hinzufügen (`POST /store/repositories`); die Meldung „already in the
+   store" ist dabei zu erwarten und aktualisiert `version_latest` trotzdem.
+   Ein Update-Aufruf während eines laufenden Builds meldet „Another job is
+   running for job group app_…". Das ist kein Fehler.
 
 ## Git
 
