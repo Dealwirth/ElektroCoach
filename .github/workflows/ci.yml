@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend-Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Systemabhaengigkeiten
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-deu tesseract-ocr-eng \
+            libjpeg-dev zlib1g-dev
+          # 'equ' (Formelzeichen) fehlt in Ubuntu, ist im Add-on-Image aber vorhanden.
+          sudo apt-get install -y tesseract-ocr-equ || true
+
+      - name: Python-Abhaengigkeiten
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r elektrocoach/requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Tests
+        run: python -m pytest
+
+  frontend:
+    name: Frontend-Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: elektrocoach/frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: elektrocoach/frontend/package-lock.json
+
+      - name: Abhaengigkeiten
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: Typpruefung
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
