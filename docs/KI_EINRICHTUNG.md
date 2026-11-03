@@ -87,6 +87,22 @@ Voraussetzungen und Grenzen:
 * Der erste Modell-Download ist mehrere hundert MB groß und dauert auf dem Pi
   einige Minuten. Der Fortschritt ist im Add-on-Log sichtbar.
 
+### Wenn Ollama "500 Internal Server Error" meldet
+
+Der Ollama-Server startet, antwortet aber auf jede Anfrage mit HTTP 500. Im
+Add-on-Log steht dann:
+
+```
+llama_init_from_model: quantized V cache requires flash_attn to be enabled
+```
+
+Ursache: Im Ollama-Add-on ist `OLLAMA_KV_CACHE_TYPE` auf `q8_0` gesetzt, aber
+`OLLAMA_FLASH_ATTENTION` ist `0`. Der quantisierte KV-Cache funktioniert nur mit
+aktivierter Flash-Attention. Lösung: In der Add-on-Konfiguration
+`OLLAMA_FLASH_ATTENTION` auf `1` setzen, das Add-on neu starten und die Anfrage
+wiederholen. Der verkleinerte KV-Cache spart Speicher auf dem Pi 4 und ist
+sinnvoll, sobald Flash-Attention aktiv ist.
+
 ## Teil 2: Google Gemini (kostenlos)
 
 Gemini übernimmt schwierige Handschrift, Bildanalyse und komplexe Fragen.
