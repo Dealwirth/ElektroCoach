@@ -234,6 +234,7 @@ def remove_discovery() -> None:
 # ---------------------------------------------------------------------------
 async def notify(title: str, message: str, service: str | None = None) -> dict[str, Any]:
     target = service or str(settings.get("ha_notify_service", "") or "") or DEFAULT_NOTIFY_SERVICE
+    explicit_target = service is not None or bool(str(settings.get("ha_notify_service", "") or ""))
     db.insert(
         "INSERT INTO notifications_log(id, kind, title, message, delivered, created_at) "
         "VALUES(?,?,?,?,?,?)",
@@ -259,7 +260,16 @@ async def notify(title: str, message: str, service: str | None = None) -> dict[s
                 json={"title": title, "message": message},
             )
             if resp.status_code >= 400:
-                return {"ok": False, "error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+                error = f"HTTP {resp.status_code}: {resp.text[:200]}"
+                if explicit_target and "notify." in f"{domain}.":
+                    error += (
+                        " - Der Dienst 'notify.*' benoetigt ein Ziel (z. B. mobile_app_...). "
+                        "Ein generisches 'notify.send_message' ohne Empfaenger wird von Home "
+                        "Assistant abgelehnt. In den Einstellungen einen konkreten Dienst "
+                        "eintragen oder das Feld leer lassen (dann wird die dauerhafte "
+                        "Benachrichtigung verwendet)."
+                    )
+                return {"ok": False, "error": error}
         db.execute(
             "UPDATE notifications_log SET delivered = 1 WHERE title = ? AND message = ?",
             (title[:200], message[:2000]),
