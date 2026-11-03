@@ -188,6 +188,11 @@ Ingress-Pfad.
 | API über Ingress | 200 |
 | Schaltplan: Projekt speichern (Punkte als Arrays) | Erfolgreich, Punkte normalisiert (echter Bugfix geprüft) |
 | Schaltplan-Bibliothek | 24 Symbole in 15 Kategorien |
+| Schaltplan-Projekt: anlegen, speichern, laden | Erfolgreich; Leitungs-Punkte als Arrays werden zu `{x,y}` normalisiert |
+| Schaltplan: SVG- und JSON-Export | Erfolgreich (gültiges SVG, JSON 1,4 kB) |
+| Schaltplan: Analyse | Bauteile, Leitungen, freie Anschlüsse und Netzwerk berechnet |
+| Schaltplan: gültige Schaltung (L1–Schalter–Lampe–N) | Keine Fehler, keine freien Anschlüsse |
+| Schaltplan: fehlerhafte Schaltung | Erkannt: toter Anschluss und Kurzschluss L1–N |
 | Import-Formate | Samsung-Notes-Container als „best effort“ gemeldet, PDF empfohlen |
 | Volltextsuche | Treffer mit Dokument-, Seiten- und Textbezug |
 | Fällige Wiederholungen | 2 Fragen fällig, Lernplan berechnet |
