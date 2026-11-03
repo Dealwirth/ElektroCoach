@@ -79,13 +79,48 @@ def test_mqtt_publish_mit_ungueltigem_host_scheitert_sauber():
         ha_integration._client = None
 
 
-def test_benachrichtigung_ohne_dienst():
+def test_benachrichtigung_ohne_dienst_nutzt_standardziel():
+    # Ohne eigene Konfiguration wird die dauerhafte HA-Benachrichtigung genutzt.
     result = _run(ha_integration.notify("Titel", "Text"))
-    assert result["ok"] is False
-    assert "Benachrichtigungsdienst" in result["error"]
+    assert result["ok"] is False  # im Test gibt es keinen Supervisor-Token
     # Der Versuch wird protokolliert.
     row = db.query_one("SELECT * FROM notifications_log ORDER BY created_at DESC LIMIT 1")
     assert row is not None
+
+
+def test_benachrichtigung_ziel_wird_zerlegt():
+    import asyncio
+    captured = {}
+
+    class _FakeResponse:
+        status_code = 200
+        text = ""
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, headers=None, json=None):
+            captured["url"] = url
+            return _FakeResponse()
+
+    original_token = ha_integration.SUPERVISOR_TOKEN
+    ha_integration.SUPERVISOR_TOKEN = "test-token"
+    import httpx
+    original_client = httpx.AsyncClient
+    httpx.AsyncClient = lambda *a, **k: _FakeClient()
+    try:
+        result = asyncio.run(
+            ha_integration.notify("Titel", "Text", "persistent_notification.create")
+        )
+        assert result["ok"] is True
+        assert captured["url"].endswith("/core/api/services/persistent_notification/create")
+    finally:
+        httpx.AsyncClient = original_client
+        ha_integration.SUPERVISOR_TOKEN = original_token
 
 
 def test_benachrichtigung_ohne_supervisor_token():
