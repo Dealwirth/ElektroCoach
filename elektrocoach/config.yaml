@@ -17,6 +17,7 @@ ingress_stream: true
 panel_icon: mdi:school
 panel_title: "ElektroCoach"
 panel_admin: false
+homeassistant_api: true
 timeout: 30
 tmpfs: true
 ports:

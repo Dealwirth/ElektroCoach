@@ -39,6 +39,8 @@ log = logging.getLogger(__name__)
 DEVICE_ID = "elektrocoach"
 DEVICE_NAME = "ElektroCoach"
 DISCOVERY_NODE = "elektrocoach"
+# Fallback ohne eigene Konfiguration: dauerhafte Benachrichtigung im HA-Frontend.
+DEFAULT_NOTIFY_SERVICE = "persistent_notification.create"
 
 _client: Any = None
 _client_lock = threading.Lock()
@@ -231,18 +233,21 @@ def remove_discovery() -> None:
 # Benachrichtigungen ueber den Supervisor
 # ---------------------------------------------------------------------------
 async def notify(title: str, message: str, service: str | None = None) -> dict[str, Any]:
-    target = service or str(settings.get("ha_notify_service", "") or "")
+    target = service or str(settings.get("ha_notify_service", "") or "") or DEFAULT_NOTIFY_SERVICE
     db.insert(
         "INSERT INTO notifications_log(id, kind, title, message, delivered, created_at) "
         "VALUES(?,?,?,?,?,?)",
         (db.new_id(), "notify", title[:200], message[:2000], 0, db.now()),
     )
-    if not target:
-        return {"ok": False, "error": "Kein Benachrichtigungsdienst konfiguriert"}
     if not SUPERVISOR_TOKEN:
         return {"ok": False, "error": "Kein Supervisor-Token verfuegbar"}
-    service = target.split(".", 1)[-1]
-    url = f"{SUPERVISOR_URL}/core/api/services/notify/{service}"
+    # Ziel kann "domain.service" (z. B. persistent_notification.create) oder nur
+    # ein Dienst innerhalb der notify-Domain sein.
+    if "." in target:
+        domain, svc = target.split(".", 1)
+    else:
+        domain, svc = "notify", target
+    url = f"{SUPERVISOR_URL}/core/api/services/{domain}/{svc}"
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.post(
@@ -259,7 +264,7 @@ async def notify(title: str, message: str, service: str | None = None) -> dict[s
             "UPDATE notifications_log SET delivered = 1 WHERE title = ? AND message = ?",
             (title[:200], message[:2000]),
         )
-        return {"ok": True}
+        return {"ok": True, "service": f"{domain}.{svc}"}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)}
 
