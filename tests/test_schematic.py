@@ -322,3 +322,31 @@ def test_rotation_normalisierung():
         x, y = schematic.rotate_point(20, 0, rotation, 80, 40)
         assert 0 <= x <= 80
         assert 0 <= y <= 80
+
+
+def test_punkte_werden_normalisiert():
+    project = schematic.create_project("Punkte", "", {"components": [], "wires": [], "junctions": []})
+    data = {
+        "components": [{"id": "c", "type": "mcb", "x": 0, "y": 0, "rotation": 0}],
+        "wires": [{"id": "w", "points": [{"x": 37, "y": 3}, [80, 40]]}],
+        "junctions": [],
+    }
+    saved = schematic.save_project(project["id"], data=data)
+    points = saved["data"]["wires"][0]["points"]
+    assert points == [{"x": 40.0, "y": 0.0}, {"x": 80.0, "y": 40.0}]
+    assert saved["stats"]["wire_length_px"] > 0
+    schematic.delete_project(project["id"])
+
+
+def test_kaputte_punkte_lassen_projekt_ladbar():
+    project = schematic.create_project("Kaputt", "", {"components": [], "wires": [], "junctions": []})
+    data = {
+        "components": [{"id": "c", "type": "mcb", "x": 0, "y": 0, "rotation": 0}],
+        "wires": [{"id": "w", "points": ["quatsch", None, {"x": "abc"}]}],
+        "junctions": [],
+    }
+    saved = schematic.save_project(project["id"], data=data)
+    assert saved is not None
+    assert saved["data"]["wires"][0]["points"] == []
+    assert schematic.get_project(project["id"]) is not None
+    schematic.delete_project(project["id"])

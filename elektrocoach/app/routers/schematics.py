@@ -53,7 +53,11 @@ class ProjectSave(BaseModel):
 
 @router.put("/schematic/projects/{project_id}")
 async def save_project(project_id: str, payload: ProjectSave) -> dict[str, Any]:
-    project = schematic.save_project(project_id, payload.name, payload.description, payload.data)
+    try:
+        project = schematic.save_project(project_id, payload.name, payload.description, payload.data)
+    except (TypeError, ValueError) as exc:
+        log.warning("Schaltplan %s konnte nicht gespeichert werden: %s", project_id, exc)
+        raise HTTPException(status_code=400, detail="Schaltplan-Daten sind ungueltig.") from exc
     if not project:
         raise HTTPException(status_code=404, detail="Projekt nicht gefunden")
     return project
