@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -28,6 +29,27 @@ log = logging.getLogger(__name__)
 
 PROVIDER = "gemini"
 API_BASE = "https://generativelanguage.googleapis.com/v1beta"
+
+# Modelle, die kurz zuvor mit 404 (abgestellt) oder 503 (ueberlastet)
+# geantwortet haben, werden voruebergehend nach hinten sortiert. So kostet ein
+# ueberlastetes Modell nicht bei jeder Anfrage erneut Wartezeit.
+_DEGRADED_TTL = 120.0
+_degraded: dict[str, float] = {}
+
+
+def _mark_degraded(name: str) -> None:
+    _degraded[name] = time.monotonic() + _DEGRADED_TTL
+
+
+def _is_degraded(name: str) -> bool:
+    until = _degraded.get(name)
+    if until is None:
+        return False
+    if until < time.monotonic():
+        _degraded.pop(name, None)
+        return False
+    return True
+
 
 # Bevorzugte Modelle im kostenlosen Kontingent (Reihenfolge = Fallback).
 # Die Liste ist nur eine Vorauswahl: Zur Laufzeit wird sie gegen die
@@ -102,7 +124,10 @@ async def model_candidates(preferred: str | None = None, images: bool = False,
         if name and name not in seen:
             seen.add(name)
             result.append(name)
-    return result
+    # Zuletzt als ueberlastet oder abgestellt gemeldete Modelle nach hinten.
+    fresh = [n for n in result if not _is_degraded(n)]
+    degraded = [n for n in result if _is_degraded(n)]
+    return fresh + degraded
 
 
 def pick_model(configured: str, models: list[str]) -> str:
@@ -306,6 +331,7 @@ async def generate(
                 # Auslastung ist pro Modell unterschiedlich.
                 last_error = f"HTTP {resp.status_code}: {resp.text[:200]}"
                 ai_usage.record(PROVIDER, use_model, task, False, last_error)
+                _mark_degraded(use_model)
                 if not candidates:
                     invalidate_model_cache()
                     candidates = await model_candidates(
@@ -342,6 +368,15 @@ async def generate(
             return {"ok": True, "text": text, "provider": PROVIDER, "model": use_model}
         except Exception as exc:  # noqa: BLE001 - Netzfehler sind erwartbar
             last_error = str(exc)
+            if isinstance(exc, httpx.TimeoutException) and not model and candidates:
+                # Ein ueberlastetes Modell kann das Lesezeitlimit reissen. Dann
+                # sofort das naechste Modell probieren, statt das Zeitlimit bei
+                # jeder Anfrage erneut abzuwarten.
+                ai_usage.record(PROVIDER, use_model, task, False, f"Zeitlimit: {exc}")
+                _mark_degraded(use_model)
+                use_model = candidates.pop(0)
+                log.warning("Gemini-Modell ueberschritt das Zeitlimit, naechster Versuch: %s", use_model)
+                continue
             if attempts <= retries:
                 await asyncio.sleep(1.5 * attempts)
                 continue
