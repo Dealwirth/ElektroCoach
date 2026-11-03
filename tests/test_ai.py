@@ -24,11 +24,13 @@ def clean_ai_state():
     settings.set_runtime("ai_mode", "auto")
     settings.set_runtime("ollama_enabled", False)
     settings.set_runtime("gemini_api_key", "")
+    gemini._degraded.clear()
     db.execute("DELETE FROM ai_usage")
     yield
     settings.set_runtime("ai_mode", "auto")
     settings.set_runtime("ollama_enabled", False)
     settings.set_runtime("gemini_api_key", "")
+    gemini._degraded.clear()
 
 
 def test_ollama_health_ohne_aktivierung():
@@ -268,6 +270,78 @@ def test_gemini_wechselt_bei_ueberlastetem_modell(monkeypatch):
     result = _run(gemini.generate("Test"))
     assert result["ok"] is True
     assert result["model"] == "gemini-3.5-flash"
+
+
+def test_gemini_wechselt_bei_zeitueberschreitung(monkeypatch):
+    """Reisst ein ueberlastetes Modell das Lesezeitlimit, wird sofort das
+    naechste Modell probiert, ohne das Limit erneut abzuwarten."""
+    settings.set_runtime("gemini_api_key", "test-key")
+    settings.set_runtime("gemini_text_model", "gemini-flash-latest")
+    settings.set_runtime("ai_max_retries", 0)
+
+    calls: list[str] = []
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.status_code = 200
+            self._payload = payload
+            self.text = str(payload)
+
+        def json(self):
+            return self._payload
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, **kwargs):
+            name = url.split("/models/", 1)[1].split(":", 1)[0]
+            calls.append(name)
+            if name == "gemini-flash-latest":
+                raise gemini.httpx.ReadTimeout("zu langsam")
+            return FakeResponse({"candidates": [{"content": {"parts": [{"text": "Antwort"}]}}]})
+
+    async def fake_list():
+        return {"available": True, "models": ["gemini-flash-latest", "gemini-3.5-flash"]}
+
+    monkeypatch.setattr(gemini.httpx, "AsyncClient", FakeClient)
+    monkeypatch.setattr(gemini, "list_models", fake_list)
+    monkeypatch.setattr(gemini.asyncio, "sleep", _no_sleep)
+    gemini.invalidate_model_cache()
+
+    result = _run(gemini.generate("Test"))
+    assert result["ok"] is True
+    assert result["model"] == "gemini-3.5-flash"
+    # Genau ein Versuch pro Modell, kein wiederholtes Abwarten.
+    assert calls == ["gemini-flash-latest", "gemini-3.5-flash"]
+
+
+def test_gemini_ueberlastetes_modell_wird_nach_hinten_sortiert(monkeypatch):
+    """Ein zuvor ueberlastetes Modell wird voruebergehend zuletzt probiert."""
+
+    async def fake_list():
+        return {"available": True, "models": ["gemini-flash-latest", "gemini-3.5-flash"]}
+
+    monkeypatch.setattr(gemini, "list_models", fake_list)
+    gemini.invalidate_model_cache()
+    settings.set_runtime("gemini_text_model", "gemini-flash-latest")
+
+    before = _run(gemini.model_candidates())
+    assert before[0] == "gemini-flash-latest"
+
+    gemini._mark_degraded("gemini-flash-latest")
+    try:
+        after = _run(gemini.model_candidates())
+        assert after[0] != "gemini-flash-latest"
+        assert "gemini-flash-latest" in after
+    finally:
+        gemini._degraded.clear()
 
 
 def test_gemini_modellwahl_ueberspringt_bildmodelle():

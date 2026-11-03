@@ -9,7 +9,7 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 
 | Punkt | Wert |
 | --- | --- |
-| Tests | 238 automatisierte Tests, 5 übersprungen |
+| Tests | 240 automatisierte Tests, 5 übersprungen |
 | Laufzeit | Python 3.13.15, FastAPI 0.119.1, Uvicorn 0.39.0 |
 | Bildverarbeitung | Pillow 11.3.0, pypdfium2 4.30.0 |
 | OCR | Tesseract mit `deu`, `eng`, `equ` |
@@ -19,7 +19,7 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 ## 1. Automatisierte Tests
 
 ```
-238 passed, 5 skipped
+240 passed, 5 skipped
 ```
 
 | Testdatei | Anzahl | Inhalt |
@@ -170,14 +170,14 @@ Diese Punkte wurden hier nicht oder nur teilweise geprüft:
 
 ## 12. Echter Raspberry Pi 4 und echter Home-Assistant-Ingress
 
-Add-on `b274c19d_elektrocoach`, Version **1.0.3**, Home Assistant OS auf
+Add-on `b274c19d_elektrocoach`, Version **1.0.4**, Home Assistant OS auf
 Raspberry Pi 4 (8 GB), aarch64, Python 3.14.10. Zugriff über den echten
 Ingress-Pfad.
 
 | Prüfung | Ergebnis |
 | --- | --- |
 | Add-on-Build (arm64) | Erfolgreich, Add-on startet |
-| `/api/health` | `status ok`, `build 1.0.2`, Datenbank ok, Import-Worker aktiv |
+| `/api/health` | `status ok`, `build 1.0.4`, Datenbank ok, Import-Worker aktiv |
 | `SUPERVISOR_TOKEN` | **Verfügbar** (`supervisor_token: true`) |
 | Benachrichtigung (Standardziel) | Erfolgreich: `persistent_notification.create` |
 | Benachrichtigung fälliger Wiederholungen | Erfolgreich |
@@ -203,7 +203,7 @@ Ingress-Pfad.
 | Backup anlegen | Erfolgreich (`livetest`) |
 | Wiederherstellung | Erfolgreich, Sicherheitskopie `vor-wiederherstellung-*.db` angelegt |
 | Daten nach Wiederherstellung | Dokumente 1, Fragen 3, Schaltpläne 2 — vollständig |
-| Add-on-Neustart über Supervisor | Erfolgreich, `state: started`, Version 1.0.3 |
+| Add-on-Neustart über Supervisor | Erfolgreich, `state: started`, Version 1.0.4 |
 | Daten nach Neustart | Erhalten (Dokumente, Fragen, Schaltpläne) |
 | `SUPERVISOR_TOKEN` nach Neustart | Weiterhin vorhanden; Scheduler läuft wieder |
 | Ressourcen | 4 Kerne, Last 0,51, freier Speicher 28 GB (47,9 %) |
@@ -232,3 +232,15 @@ Ingress-Pfad.
    unverständlicher Meldung. Die Fehlermeldung erklärt jetzt die Ursache und
    den Ausweg; Standardziel bleibt `persistent_notification.create`. Version
    1.0.3 ausgeliefert und auf dem Pi geprüft.
+4. **Wartezeit bei überlastetem Gemini-Modell.** `gemini-flash-latest`
+   antwortete zeitweise mit HTTP 503 („high demand"). Die Anfrage wurde zwar
+   korrekt auf das nächste Modell umgeleitet, kostete aber bei jeder Anfrage
+   erneut Wartezeit (bis zu 180 s Lesezeitlimit). Behoben in Version 1.0.4:
+   - Ein Modell, das mit 404 oder 503 antwortet, wird 120 s lang als
+     „degraded" nach hinten sortiert.
+   - Reisst ein Modell das Lesezeitlimit, wird sofort das nächste Modell
+     probiert, statt das Limit erneut abzuwarten.
+   - Ein erfolgreich genutztes Ausweichmodell wird weiterhin gemerkt, sodass
+     die nächste Anfrage direkt das funktionierende Modell nutzt.
+   Geprüft mit zwei neuen Tests (`test_gemini_wechselt_bei_zeitueberschreitung`,
+   `test_gemini_ueberlastetes_modell_wird_nach_hinten_sortiert`) und auf dem Pi.

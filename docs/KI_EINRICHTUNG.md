@@ -93,9 +93,16 @@ Frontend oder an Dritte gesendet. In der Oberfläche erscheint er nur als
 
 ### Kostenloses Kontingent und Grenzen
 
-* Kostenlos verfügbar sind die Flash-Modelle: `gemini-2.5-flash` und
-  `gemini-2.5-flash-lite`. Pro-Modelle sind seit April 2026 kostenpflichtig und
-  werden nicht verwendet.
+* Kostenlos verfügbar sind die Flash-Modelle. ElektroCoach prüft die Liste zur
+  Laufzeit und bevorzugt `gemini-flash-latest`, danach `gemini-3.5-flash`,
+  `gemini-3-flash-preview`, `gemini-2.5-flash`, `gemini-flash-lite-latest` und
+  `gemini-2.5-flash-lite`. Pro-Modelle sind kostenpflichtig und werden nie
+  verwendet.
+* Google stellt Modelle regelmäßig ab oder benennt sie um. ElektroCoach prüft
+  das gewählte Modell gegen die aktuelle Liste und wechselt bei HTTP 404
+  (abgestellt) oder HTTP 503 (überlastet) automatisch auf das nächste Modell.
+  Ein überlastetes Modell wird zwei Minuten lang zuletzt probiert, damit die
+  Wartezeit nicht bei jeder Anfrage erneut entsteht.
 * Übliche Grenze: **1.500 Anfragen pro Tag** für Flash-Modelle. Die Grenze kann
   sich ändern; sie steht in der Google-Dokumentation.
 * ElektroCoach begrenzt sich zusätzlich selbst über **Gemini-Tageslimit**
