@@ -56,7 +56,7 @@ LABEL \
     io.hass.name="ElektroCoach" \
     io.hass.description="KI-Lernplattform für Elektroniker Energie- und Gebäudetechnik" \
     io.hass.type="app" \
-    io.hass.version="1.0.0" \
+    io.hass.version="1.0.1" \
     io.hass.arch="aarch64|amd64"
 
 CMD [ "/run.sh" ]
