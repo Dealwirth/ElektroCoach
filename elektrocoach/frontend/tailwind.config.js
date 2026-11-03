@@ -1,22 +1,31 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  // Dunkle Betriebsart folgt der Klasse `dark` am Wurzelelement. Diese Klasse
+  // wird aus der Home-Assistant-Einstellung abgeleitet (siehe src/theme.ts),
+  // nicht aus der Betriebssystem-Einstellung des Browsers.
+  darkMode: "class",
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
+        // Die Grundfarben (Flächen, Text, Rahmen) liegen als CSS-Variablen vor.
+        // Dadurch folgen alle vorhandenen Klassen (bg-white, text-ink-900 …)
+        // automatisch der hellen oder dunklen Betriebsart, ohne dass jede
+        // Stelle einzeln angepasst werden muss. Die Werte stehen in index.css.
+        white: "rgb(var(--c-white) / <alpha-value>)",
         // Helles, dezentes Farbschema mit Elektro-Akzent.
         brand: {
-          50: "#eef7ff",
-          100: "#d9edff",
-          200: "#bce0ff",
-          300: "#8ecdff",
-          400: "#59b0ff",
-          500: "#338fff",
-          600: "#1b6ff5",
-          700: "#1458e1",
-          800: "#1748b6",
-          900: "#19408f",
-          950: "#142857",
+          50: "rgb(var(--c-brand-50) / <alpha-value>)",
+          100: "rgb(var(--c-brand-100) / <alpha-value>)",
+          200: "rgb(var(--c-brand-200) / <alpha-value>)",
+          300: "rgb(var(--c-brand-300) / <alpha-value>)",
+          400: "rgb(var(--c-brand-400) / <alpha-value>)",
+          500: "rgb(var(--c-brand-500) / <alpha-value>)",
+          600: "rgb(var(--c-brand-600) / <alpha-value>)",
+          700: "rgb(var(--c-brand-700) / <alpha-value>)",
+          800: "rgb(var(--c-brand-800) / <alpha-value>)",
+          900: "rgb(var(--c-brand-900) / <alpha-value>)",
+          950: "rgb(var(--c-brand-950) / <alpha-value>)",
         },
         accent: {
           50: "#fff8ed",
@@ -31,16 +40,16 @@ export default {
           900: "#7f2f0f",
         },
         ink: {
-          50: "#f7f8fa",
-          100: "#eef0f4",
-          200: "#d9dde5",
-          300: "#b8bfcd",
-          400: "#8f9aae",
-          500: "#6b778f",
-          600: "#525c72",
-          700: "#3f4759",
-          800: "#2b3141",
-          900: "#1c2130",
+          50: "rgb(var(--c-ink-50) / <alpha-value>)",
+          100: "rgb(var(--c-ink-100) / <alpha-value>)",
+          200: "rgb(var(--c-ink-200) / <alpha-value>)",
+          300: "rgb(var(--c-ink-300) / <alpha-value>)",
+          400: "rgb(var(--c-ink-400) / <alpha-value>)",
+          500: "rgb(var(--c-ink-500) / <alpha-value>)",
+          600: "rgb(var(--c-ink-600) / <alpha-value>)",
+          700: "rgb(var(--c-ink-700) / <alpha-value>)",
+          800: "rgb(var(--c-ink-800) / <alpha-value>)",
+          900: "rgb(var(--c-ink-900) / <alpha-value>)",
         },
         success: "#12a150",
         warning: "#d97706",

@@ -25,6 +25,8 @@ DEFAULTS: dict[str, Any] = {
     "ollama_enabled": False,
     "ocr_languages": "deu+eng",
     "ai_mode": "auto",
+    "refine_after_import": False,
+    "refine_use_cloud": False,
     "ha_notify_service": "",
     "mqtt_enabled": False,
     "mqtt_host": "core-mosquitto",

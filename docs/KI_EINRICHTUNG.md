@@ -64,6 +64,29 @@ ollama list
 4. **Ollama-Modell**: `llama3.2:3b`.
 5. **Speichern**. Der Status erscheint unter **System**.
 
+### Automatische Einrichtung (empfohlen)
+
+ElektroCoach kann das Ollama-Add-on selbst installieren, starten und die
+richtige Adresse eintragen. Das spart die manuellen Schritte oben.
+
+1. ElektroCoach → **Einstellungen → KI-Dienste**.
+2. Im Bereich **Ollama automatisch einrichten** auf
+   **Ollama installieren & starten** klicken.
+3. Warten, bis die Meldung erscheint, dass das Add-on läuft. Die Adresse wird
+   dabei automatisch in **Ollama-URL** übernommen.
+4. Im Feld **Modell herunterladen** ein Modell eintragen (z. B.
+   `llama3.2:3b`) und **Herunterladen** klicken.
+
+Voraussetzungen und Grenzen:
+
+* Die automatische Einrichtung braucht den Supervisor, also Home Assistant OS
+  oder Supervised. Auf einer reinen Docker-Installation ohne Supervisor ist die
+  Schaltfläche deaktiviert; dann die manuelle Einrichtung oben verwenden.
+* Es wird ausschließlich das kostenlose Community-Add-on **Ollama**
+  installiert. Es entstehen keine Kosten und keine Abrechnung.
+* Der erste Modell-Download ist mehrere hundert MB groß und dauert auf dem Pi
+  einige Minuten. Der Fortschritt ist im Add-on-Log sichtbar.
+
 ## Teil 2: Google Gemini (kostenlos)
 
 Gemini übernimmt schwierige Handschrift, Bildanalyse und komplexe Fragen.
@@ -117,6 +140,23 @@ Frontend oder an Dritte gesendet. In der Oberfläche erscheint er nur als
   bewusst aus.
 * Textanfragen senden nur den nötigen Ausschnitt, nicht das ganze Dokument.
 * Unter **System → KI** ist jederzeit sichtbar, wann welche KI genutzt wurde.
+
+## KI-Nachbearbeitung erkannter Texte
+
+Nach dem Import kann ElektroCoach unsicher erkannte Seiten mit der KI
+nachbearbeiten. Die Nachbearbeitung korrigiert OCR-Fehler, Formeln und
+Einheiten und verknüpft die Quellen neu.
+
+* **Einstellungen → Import**: **Nach dem Import automatisch nachbearbeiten**
+  startet die Nachbearbeitung direkt nach einem Import.
+* **Import-Seite**: Der Bereich **KI-Nachbearbeitung erkannter Texte** startet
+  und überwacht die Nachbearbeitung manuell. Der Fortschritt ist sichtbar, ein
+  Abbruch ist jederzeit möglich.
+* Standardmäßig läuft die Nachbearbeitung **nur lokal** über Ollama. Erst mit
+  **Nachbearbeitung darf Gemini nutzen** (`refine_use_cloud`) geht sie an die
+  Cloud.
+* Ist keine KI erreichbar, bleibt der Originaltext unverändert erhalten und die
+  Seite weiterhin als „zu prüfen" markiert. Es gehen keine Inhalte verloren.
 
 ## Ausfallverhalten
 

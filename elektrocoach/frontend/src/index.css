@@ -2,9 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Farbschema. Die Werte stehen als reine RGB-Tripel vor, damit Tailwind sie
+ * mit Deckkraft kombinieren kann (z. B. bg-ink-900/40). Die dunkle Betriebsart
+ * überschreibt nur die Variablen; dadurch folgen alle Bausteine automatisch.
+ */
 @layer base {
   :root {
     color-scheme: light;
+
+    --c-white: 255 255 255;
+
+    --c-ink-50: 247 248 250;
+    --c-ink-100: 238 240 244;
+    --c-ink-200: 217 221 229;
+    --c-ink-300: 184 191 205;
+    --c-ink-400: 143 154 174;
+    --c-ink-500: 107 119 143;
+    --c-ink-600: 82 92 114;
+    --c-ink-700: 63 71 89;
+    --c-ink-800: 43 49 65;
+    --c-ink-900: 28 33 48;
+
+    --c-brand-50: 238 247 255;
+    --c-brand-100: 217 237 255;
+    --c-brand-200: 188 224 255;
+    --c-brand-300: 142 205 255;
+    --c-brand-400: 89 176 255;
+    --c-brand-500: 51 143 255;
+    --c-brand-600: 27 111 245;
+    --c-brand-700: 20 88 225;
+    --c-brand-800: 23 72 182;
+    --c-brand-900: 25 64 143;
+    --c-brand-950: 20 40 87;
+
+    /* Semantische Flächen für den Schaltplan-Editor. */
+    --canvas-bg: #fbfcfe;
+    --canvas-grid-minor: #e6ebf2;
+    --canvas-grid-major: #cfd8e3;
+    --canvas-wire: #1e293b;
+    --canvas-ink: #0f172a;
+    --canvas-label: #475569;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --c-white: 23 29 40;
+
+    --c-ink-50: 15 20 28;
+    --c-ink-100: 27 34 46;
+    --c-ink-200: 42 51 66;
+    --c-ink-300: 63 74 92;
+    --c-ink-400: 116 128 148;
+    --c-ink-500: 152 163 181;
+    --c-ink-600: 178 188 203;
+    --c-ink-700: 203 211 222;
+    --c-ink-800: 224 229 236;
+    --c-ink-900: 242 245 249;
+
+    --c-brand-50: 26 40 66;
+    --c-brand-100: 30 52 92;
+    --c-brand-200: 34 68 124;
+    --c-brand-300: 48 96 168;
+    --c-brand-400: 74 132 214;
+    --c-brand-500: 100 162 255;
+    --c-brand-600: 59 130 246;
+    --c-brand-700: 96 165 250;
+    --c-brand-800: 147 197 253;
+    --c-brand-900: 191 219 254;
+    --c-brand-950: 219 234 254;
+
+    --canvas-bg: #111826;
+    --canvas-grid-minor: #1f2a3a;
+    --canvas-grid-major: #2c3a4f;
+    --canvas-wire: #cbd5e1;
+    --canvas-ink: #e2e8f0;
+    --canvas-label: #94a3b8;
   }
 
   html,
@@ -20,7 +94,8 @@
 
   /* Fokusringe einheitlich und gut sichtbar. */
   :focus-visible {
-    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white;
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2;
+    --tw-ring-offset-color: rgb(var(--c-white));
   }
 }
 
@@ -129,4 +204,64 @@
     linear-gradient(to right, #e2e8f0 1px, transparent 1px),
     linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
   background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+}
+
+/*
+ * Zustandsfarben (Erfolg, Warnung, Fehler) in der dunklen Betriebsart.
+ * Die hellen Flächen der hellen Betriebsart wirken im Dunkeln grell. Statt in
+ * jeder Datei `dark:`-Varianten zu ergänzen, werden hier die betroffenen
+ * Tailwind-Klassen gezielt überschrieben. Das hält die Seiten unverändert.
+ */
+.dark .bg-emerald-50,
+.dark .bg-emerald-50\/50,
+.dark .bg-emerald-100 {
+  background-color: rgb(6 78 59 / 0.35);
+}
+
+.dark .bg-amber-50,
+.dark .bg-amber-50\/50,
+.dark .bg-amber-100 {
+  background-color: rgb(120 53 15 / 0.35);
+}
+
+.dark .bg-red-50,
+.dark .bg-red-100 {
+  background-color: rgb(127 29 29 / 0.35);
+}
+
+.dark .bg-brand-50 {
+  background-color: rgb(var(--c-brand-50) / 0.55);
+}
+
+.dark .border-emerald-200,
+.dark .border-emerald-300 {
+  border-color: rgb(16 185 129 / 0.45);
+}
+
+.dark .border-amber-200 {
+  border-color: rgb(245 158 11 / 0.45);
+}
+
+.dark .border-red-200 {
+  border-color: rgb(248 113 113 / 0.45);
+}
+
+.dark .text-emerald-700,
+.dark .text-emerald-900 {
+  color: #6ee7b7;
+}
+
+.dark .text-amber-700,
+.dark .text-amber-900 {
+  color: #fcd34d;
+}
+
+.dark .text-red-600,
+.dark .text-red-700,
+.dark .text-red-900 {
+  color: #fca5a5;
+}
+
+.dark .text-brand-900 {
+  color: rgb(var(--c-brand-900));
 }

@@ -9,7 +9,7 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 
 | Punkt | Wert |
 | --- | --- |
-| Tests | 240 automatisierte Tests, 5 übersprungen |
+| Tests | 280 automatisierte Tests, 5 übersprungen |
 | Laufzeit | Python 3.13.15, FastAPI 0.119.1, Uvicorn 0.39.0 |
 | Bildverarbeitung | Pillow 11.3.0, pypdfium2 4.30.0 |
 | OCR | Tesseract mit `deu`, `eng`, `equ` |
@@ -19,21 +19,26 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 ## 1. Automatisierte Tests
 
 ```
-240 passed, 5 skipped
+280 passed, 5 skipped
 ```
 
 | Testdatei | Anzahl | Inhalt |
 | --- | --- | --- |
 | `test_api.py` | 39 | HTTP-Endpunkte, Antwortformate, Fehlerfälle |
+| `test_schematic.py` | 29 | Symbole, Leitungen, Raster, Validierung, Export |
 | `test_learning.py` | 27 | Themen, Fragen, Bewertung, Lernplan |
-| `test_schematic.py` | 27 | Symbole, Leitungen, Raster, Validierung, Export |
-| `test_database.py` | 23 | Schema, FTS5, Transaktionen, WAL |
-| `test_ha_and_resources.py` | 23 | Sensoren, Sensorwerte, Speichergrenzen |
+| `test_ha_and_resources.py` | 25 | Sensoren, Sensorwerte, Speichergrenzen |
+| `test_ai.py` | 23 | Weiterleitung, Kontingent, Ausfälle |
+| `test_database.py` | 24 | Schema, FTS5, Transaktionen, WAL |
 | `test_offline.py` | 19 | Ersatzverfahren ohne KI |
-| `test_ai.py` | 18 | Weiterleitung, Kontingent, Ausfälle |
+| `test_robustness.py` | 19 | Fehlerfälle, kaputte Eingaben, Randwerte |
 | `test_exam.py` | 15 | Prüfungsablauf, Punkte, Vergleich |
 | `test_ocr.py` | 15 | Text-, PDF- und Bildverarbeitung, Auflösung |
-| `test_settings_wiring.py` | 11 | Einstellungen wirken tatsächlich (neu) |
+| `test_ollama_addon.py` | 14 | Ollama-Add-on über den Supervisor (neu) |
+| `test_settings_wiring.py` | 11 | Einstellungen wirken tatsächlich |
+| `test_refine_api.py` | 10 | Endpunkte der KI-Nachbearbeitung (neu) |
+| `test_refine.py` | 8 | Zweistufige Nachbearbeitung (neu) |
+| `test_spa_base.py` | 7 | Auslieferung der Oberfläche, `<base>` für Ingress (neu) |
 
 ## 2. Container-Build und -Start (echt durchgeführt)
 
@@ -60,8 +65,14 @@ Nachgebildeter Ingress-Proxy mit dem Pfad `/api/hassio_ingress/AbC123Token`:
 Dabei wurde ein echter Fehler gefunden und behoben: Die Oberfläche verwendete
 relative Dateipfade. Das funktionierte nur auf der Startseite. Auf
 verschachtelten Seiten (etwa `/pruefungen/abc`) zeigten Dateipfade ins Leere.
-Behoben durch einen `<base>`-Tag, der zur Laufzeit gesetzt wird, und durch
-einen Router-Basispfad.
+Zuerst wurde ein `<base>`-Tag zur Laufzeit per JavaScript gesetzt. Das reichte
+jedoch nicht: der Browser liest `<base>` schon beim Vorabladen
+(Preload-Scanner), deshalb lud Chromium auf verschachtelten Seiten
+`assets/index-*.css` gegen den falschen Pfad und verwarf das Stylesheet
+(„MIME type text/html"). Behoben in Version 1.0.5: Das Backend setzt den
+Basispfad serverseitig in den Kopf der ausgelieferten Seite (aus dem Kopf
+`X-Ingress-Path`). Zusätzlich wird ein Router-Basispfad genutzt. Geprüft mit
+`test_spa_base.py` (7 Tests) und im Browser auf verschachtelten Seiten.
 
 ## 4. Import und OCR (echt durchgeführt)
 
@@ -247,3 +258,78 @@ Ingress-Pfad.
      die nächste Anfrage direkt das funktionierende Modell nutzt.
    Geprüft mit zwei neuen Tests (`test_gemini_wechselt_bei_zeitueberschreitung`,
    `test_gemini_ueberlastetes_modell_wird_nach_hinten_sortiert`) und auf dem Pi.
+
+## 13. Version 1.0.5: KI-Nachbearbeitung, Ollama-Add-on, Oberflächenprüfung
+
+In dieser Umgebung tatsächlich durchgeführt (Docker-Container, echter Browser
+mit Chromium über Playwright).
+
+### 13.1 Neue Funktionen
+
+| Funktion | Beschreibung |
+| --- | --- |
+| Ollama-Add-on-Verwaltung | Das Add-on kann sich das Ollama-Add-on über den Supervisor selbst installieren, starten und die Adresse eintragen (`/api/ai/ollama/addon`, `/ensure`, `/installed`, `/pull`) |
+| KI-Nachbearbeitung erkannter Texte | Zweistufig: zuerst Ollama lokal, bei unsicheren Seiten optional Gemini (nur mit ausdrücklicher Freigabe). Hintergrund-Worker, abbrechbar, mit Speicher- und Platzbremse |
+| Endpunkte der Nachbearbeitung | `/api/ai/refine`, `/refine/jobs`, `/refine/jobs/{id}`, `/refine/jobs/{id}/cancel`, `/refine/page` |
+| Nachbearbeitung nach Import | Einstellung `refine_after_import`; startet nur, wenn wirklich eine KI erreichbar ist |
+| Helles/dunkles Design | Folgt der Home-Assistant-Einstellung; Schaltplan-Leitungen und Symbole bleiben in beiden Betriebsarten sichtbar |
+
+### 13.2 Echte Bedientests im Browser
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Alle Seiten laden (`/`, `/import`, `/bibliothek`, `/lernen`, `/pruefungen`, `/schaltplan`, `/tutor`, `/einstellungen`, `/system`) | Alle 200, keine 404-Ressource, keine Konsolenfehler |
+| Dunkle Betriebsart | Klasse `dark` aktiv, Farben passen sich an |
+| Verschachtelte Seite (`/schaltplan/editor/<id>`) | Stylesheet lädt korrekt (Fehler aus Abschnitt 3 behoben) |
+| Ollama-Bereich in den Einstellungen | Vorhanden und bedienbar |
+| Nachbearbeitungsbereich auf der Import-Seite | Vorhanden |
+| Bauteile über die Bibliothek einfügen | 2 Bauteile eingefügt, gespeichert und wieder geladen |
+| Leitung zwischen zwei Anschlüssen ziehen | Leitung mit Verbindung `switch.1 → changeover.1` gespeichert |
+| Leitung ziehen, während der Zeiger die Fläche verlässt | Leitung bleibt erhalten (Zeiger wird eingefangen) |
+| Nachbearbeitung ohne erreichbare KI | Klare Meldung in der Oberfläche, kein Hängen |
+| `/api/ai/refine` ohne KI | HTTP 400 mit verständlicher Meldung |
+| Neustart des Containers | `/api/health` wieder `ok`, Datenbank und beide Worker aktiv |
+
+### 13.3 Dabei gefundene und behobene Fehler
+
+1. **Stylesheet fehlte auf verschachtelten Seiten** (siehe Abschnitt 3).
+   Behoben durch serverseitiges `<base>`-Element.
+2. **Leitung wurde beim Verlassen der Zeichenfläche vorzeitig beendet.**
+   `onPointerLeave` beendete das Ziehen, obwohl der Zielanschluss noch folgen
+   sollte. Behoben durch Einfangen des Zeigers (`setPointerCapture`) beim Start
+   einer Leitung.
+3. **Abschluss-Checkpoint der Datenbank konnte beim Herunterfahren fehlschlagen**
+   („disk I/O error"), wenn die Datenbankdatei zuvor ersetzt wurde (etwa nach
+   einer Wiederherstellung). Beim Herunterfahren wird der Fehler jetzt nur
+   protokolliert (`db.checkpoint_quiet`), das Beenden läuft weiter.
+4. **Nach einer Wiederherstellung schlugen alle Schreibzugriffe fehl.** Die
+   Datenbankdatei wurde ersetzt, aber bestehende Verbindungen anderer Threads
+   zeigten weiter auf die gelöschte Datei. Jeder Schreibzugriff (Import,
+   Bewertung, Backup) endete mit „disk I/O error" — auch nach dem geforderten
+   Neustart blieb die Anwendung bis zum manuellen Neustart des Add-ons
+   schreibunfähig. Behoben in Version 1.0.5: Ein Verbindungsgenerationszähler
+   (`db.invalidate_connections`) zwingt jeden Thread, seine Verbindung nach
+   dem Ersetzen der Datei neu aufzubauen. Das Ersetzen läuft unter der
+   Schreibsperre (`db.replace_database_file`). Geprüft mit dem Test
+   `test_nach_wiederherstellung_sind_schreibzugriffe_moeglich` (schlägt ohne
+   die Behebung fehl) und im Container (Import direkt nach einer
+   Wiederherstellung).
+5. **Wartezeit beim Einrichten des Ollama-Add-ons.** Das Warten auf die
+   Erreichbarkeit ist jetzt auf 90 s begrenzt, damit die Oberfläche hinter dem
+   Ingress nicht in eine Zeitüberschreitung läuft. Längere Starts werden über
+   den Status erneut geprüft.
+
+### 13.4 Gesamtprüfung im Container (Version 1.0.5)
+
+| Schritt | Ergebnis |
+| --- | --- |
+| PNG-Import mit Fachtext | Erfolgreich, Hintergrundjob `done`, 1 Seite |
+| Volltextsuche nach dem importierten Text | 1 Treffer mit Dokument- und Seitenbezug |
+| Themenkatalog | 28 Themen vorhanden |
+| Fragen erzeugen ohne KI | Antwort 200 mit verständlichem Hinweis, keine Fragen erfunden |
+| Prüfungssimulation ohne Fragen | HTTP 400 mit klarer Begründung |
+| Schaltplan anlegen, speichern, validieren | 2 Bauteile, 1 Leitung; freie Anschlüsse korrekt gemeldet |
+| SVG-Export | Gültiges SVG |
+| Backup anlegen und wiederherstellen | Beides erfolgreich, Sicherheitskopie angelegt |
+| Import direkt nach der Wiederherstellung | Erfolgreich (vorher „disk I/O error") |
+| `/api/health` nach allen Schritten | `status ok`, `db ok`, `worker_alive true` |

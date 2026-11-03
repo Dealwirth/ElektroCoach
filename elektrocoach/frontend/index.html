@@ -7,17 +7,17 @@
     <title>ElektroCoach</title>
     <!--
       Home Assistant stellt das Add-on unter einem wechselnden Pfad aus
-      (/api/hassio_ingress/<token>/). Dieser Pfad ist zur Build-Zeit unbekannt,
-      deshalb wird er hier zur Laufzeit ermittelt und als <base> gesetzt.
-      Damit loesen auch verschachtelte Seiten (z. B. /pruefungen/abc) ihre
-      Dateipfade (assets/...) korrekt auf, nicht nur die Startseite.
+      (/api/hassio_ingress/<token>/). Dieser Pfad ist zur Build-Zeit unbekannt.
+      Das Backend fuegt deshalb beim Ausliefern ein Basiselement in den Kopf
+      ein (siehe app/main.py, _base_href). Dieses Skript ist nur ein Ersatz,
+      falls die Seite ohne das Backend ausgeliefert wird (Entwicklung, Tests).
     -->
     <script>
       (function () {
+        if (document.querySelector("base")) return;
         var match = window.location.pathname.match(/^(.*?\/hassio_ingress\/[^/]+)/);
-        var prefix = match ? match[1] : "";
         var base = document.createElement("base");
-        base.href = prefix + "/";
+        base.href = (match ? match[1] : "") + "/";
         document.head.insertBefore(base, document.head.firstChild);
       })();
     </script>

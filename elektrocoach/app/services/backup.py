@@ -128,11 +128,9 @@ def restore_backup(name: str, restore_documents: bool = True) -> dict[str, Any]:
         if settings.db_path.exists():
             shutil.copy2(settings.db_path, safety)
 
-        db.close_thread_connection()
-        shutil.copy2(db_file, settings.db_path)
-        for suffix in ("-wal", "-shm"):
-            side = Path(str(settings.db_path) + suffix)
-            side.unlink(missing_ok=True)
+        # Datei unter der Schreibsperre ersetzen, danach alle Threads zwingen,
+        # ihre Verbindung neu aufzubauen.
+        db.replace_database_file(db_file)
 
         if restore_documents:
             for folder in ("documents", "pages", "schematics"):

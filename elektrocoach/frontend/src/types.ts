@@ -301,6 +301,55 @@ export interface AiStatus {
   };
 }
 
+export interface OllamaAddonStatus {
+  supervisor: boolean;
+  installed: boolean;
+  state?: string | null;
+  slug?: string | null;
+  url?: string;
+  suggested_url?: string;
+  error?: string;
+}
+
+export interface OllamaAddonEnsure {
+  ok: boolean;
+  slug?: string;
+  url?: string;
+  installed?: boolean;
+  started?: boolean;
+  created?: boolean;
+  reachable?: boolean;
+  state?: string | null;
+  error?: string | null;
+}
+
+export interface RefineJob {
+  id: string;
+  document_id?: string | null;
+  scope: string;
+  status: string;
+  total_pages: number;
+  processed_pages: number;
+  current_page: number;
+  message: string;
+  progress_percent?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RefineResult {
+  ok: boolean;
+  page_id?: string;
+  document_id?: string;
+  original?: string;
+  text?: string;
+  confidence?: number | null;
+  needs_review?: boolean;
+  notes?: string;
+  providers?: string[];
+  error?: string;
+}
+
 export interface StorageReport {
   disk_total_mb: number;
   disk_used_mb: number;
