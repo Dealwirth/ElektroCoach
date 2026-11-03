@@ -216,6 +216,9 @@ Ingress-Pfad.
 | Dokument löschen | Erfolgreich, Bestand wieder 1 Dokument |
 | Benachrichtigung aus der Oberfläche | Testnachricht gesendet, in Home Assistant sichtbar (`persistent_notification/get`) |
 | Alle Kernendpunkte über Ingress | 200 (`/api/topics`, `/api/review/due`, `/api/plan`, `/api/progress`, `/api/questions`, `/api/documents`, `/api/storage`, `/api/system/info`, `/api/goals`, `/api/schematics/library`, `/api/backups`, `/api/ha/status`, `/api/search`, `/api/ai/status`) |
+| Version 1.0.4 auf dem Pi installiert | Erfolgreich; `/api/health` meldet `version 1.0.4`, `build 1.0.4`, `db ok`, `worker_alive true`, `supervisor_token true` |
+| KI-Antwortzeit nach Modellwechsel-Fix | Erste Anfrage 33 s (einmaliger Wechsel von `gemini-flash-latest` auf `gemini-3.5-flash`), Folgeanfragen 12–13 s |
+| Verhalten ohne KI (`ai_mode: off`) | Sofortige, verständliche Meldung in 0,4 s; kein Hängen; Hinweis, dass Wissenssuche und Lernfunktionen ohne KI verfügbar bleiben |
 
 ### Gefundene und behobene Fehler auf dem echten System
 
