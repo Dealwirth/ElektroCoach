@@ -25,6 +25,10 @@ class _SupervisorHandler(BaseHTTPRequestHandler):
         return
 
     def _send(self, code: int, payload: dict | None = None) -> None:
+        # Der echte Supervisor verpackt Erfolgsantworten in
+        # {"result": "ok", "data": ...}. Das bildet der Testserver nach.
+        if code == 200 and payload is not None:
+            payload = {"result": "ok", "data": payload}
         body = json.dumps(payload or {}).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -133,6 +137,21 @@ def test_url_from_addon_ohne_hostname_faellt_auf_slug_zurueck():
 
 def test_url_from_addon_ohne_angaben():
     assert ollama_addon.url_from_addon({}) is None
+
+
+def test_unwrap_packt_supervisor_antwort_aus():
+    # Der Supervisor liefert {"result": "ok", "data": {...}}.
+    payload = {"result": "ok", "data": {"addons": [{"slug": "x"}]}}
+    assert ollama_addon.unwrap(payload) == {"addons": [{"slug": "x"}]}
+
+
+def test_unwrap_meldet_supervisor_fehler():
+    with pytest.raises(ollama_addon.SupervisorError):
+        ollama_addon.unwrap({"result": "error", "message": "Forbidden"})
+
+
+def test_unwrap_laesst_klartext_durch():
+    assert ollama_addon.unwrap({"models": []}) == {"models": []}
 
 
 def test_find_installed_erkennt_ollama(supervisor):
