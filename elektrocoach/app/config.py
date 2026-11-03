@@ -25,6 +25,8 @@ DEFAULTS: dict[str, Any] = {
     "ollama_enabled": False,
     "ocr_languages": "deu+eng",
     "ai_mode": "auto",
+    "refine_after_import": False,
+    "refine_use_cloud": False,
     "ha_notify_service": "",
     "mqtt_enabled": False,
     "mqtt_host": "core-mosquitto",
@@ -56,8 +58,9 @@ DEFAULTS: dict[str, Any] = {
     "import_max_zip_member_mb": 128,
     "import_max_unpacked_mb": 4096,
     "dedupe_threshold": 0.92,
-    # KI
-    "ai_timeout_seconds": 60,
+    # KI. Auf dem Raspberry Pi 4 dauert eine lokale Antwort leicht ueber eine
+    # Minute; 60 s waren zu knapp und brachen gueltige Antworten ab.
+    "ai_timeout_seconds": 180,
     "ai_max_retries": 1,
     "gemini_daily_limit": 450,
     # Sicherheit

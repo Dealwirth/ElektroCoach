@@ -51,7 +51,12 @@ Kontingent). Ziel: Raspberry Pi 4, 8 GB, Home Assistant OS, aarch64.
    nicht mehrere Literale. `ELEKTROCOACH_BUILD` und `supervisor_token` in
    `/api/health` zeigen, ob eine Installation wirklich aktuell ist.
 3. **Ingress-Pfade.** Der Ingress-Pfad ist zur Build-Zeit unbekannt. Das
-   Frontend setzt zur Laufzeit ein `<base>`-Tag (siehe `index.html`).
+   `<base>`-Element muss **serverseitig** in den Kopf der ausgelieferten Seite
+   (`app/main.py`, `_base_href` aus dem Kopf `X-Ingress-Path`). Ein zur Laufzeit
+   per JavaScript gesetztes `<base>` kommt für den Preload-Scanner des Browsers
+   zu spät: Chromium lädt `assets/...` auf verschachtelten Seiten gegen den
+   falschen Pfad und verwirft das Stylesheet („MIME type text/html"). Das
+   Skript in `index.html` ist nur ein Ersatz ohne Backend.
 4. **`notify.*` braucht ein Ziel.** Ein konfiguriertes `notify.send_message`
    ohne Empfänger lehnt Home Assistant mit HTTP 400 ab. Standard ist
    `persistent_notification.create` (Feld leer lassen).
@@ -66,6 +71,14 @@ Kontingent). Ziel: Raspberry Pi 4, 8 GB, Home Assistant OS, aarch64.
    store" ist dabei zu erwarten und aktualisiert `version_latest` trotzdem.
    Ein Update-Aufruf während eines laufenden Builds meldet „Another job is
    running for job group app_…". Das ist kein Fehler.
+7. **Datenbankverbindungen überleben kein Ersetzen der Datei.** Nach einer
+   Wiederherstellung zeigt die Verbindung eines Threads auf die gelöschte
+   Datei; jeder Schreibzugriff scheitert mit „disk I/O error". Beim Ersetzen
+   immer `db.replace_database_file(...)` verwenden (erhöht den
+   Verbindungsgenerationszähler). Beim Herunterfahren `db.checkpoint_quiet()`.
+8. **Schaltplan-Leitungen und Zeiger.** Beim Ziehen einer Leitung den Zeiger
+   einfangen (`setPointerCapture`). Sonst beendet `onPointerLeave` das Ziehen,
+   bevor der Zielanschluss erreicht ist.
 
 ## Git
 

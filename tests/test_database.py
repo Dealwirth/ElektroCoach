@@ -240,6 +240,66 @@ def test_backup_pfad_ausbruch_wird_verhindert():
     assert backup.delete_backup("nicht-vorhanden.tar.gz") is False
 
 
+def test_nach_wiederherstellung_sind_schreibzugriffe_moeglich():
+    """Regression: nach dem Ersetzen der Datenbankdatei muss Schreiben gehen.
+
+    Beim Ersetzen der Datei werden auch die WAL-Dateien entfernt. Eine
+    Verbindung, die vorher bestand, zeigt danach ins Leere; Schreibzugriffe
+    scheiterten mit "disk I/O error". Der Verbindungsgenerationszaehler zwingt
+    jeden Thread, die Verbindung neu aufzubauen.
+    """
+    import threading
+
+    from app.services import backup
+
+    db.set_setting("restore_probe", "vor")
+    result = backup.create_backup("restore-test", include_documents=False)
+    assert result["ok"] is True
+    name = result["name"]
+    db.set_setting("restore_probe", "nach")
+
+    ready = threading.Event()
+    proceed = threading.Event()
+    outcome: dict[str, object] = {}
+
+    def worker() -> None:
+        before = db.get_conn()
+        outcome["before"] = id(before)
+        ready.set()
+        proceed.wait(timeout=10)
+        try:
+            after = db.get_conn()
+            outcome["after"] = id(after)
+            db.set_setting("restore_thread", "ok")
+            outcome["value"] = db.get_setting("restore_thread")
+        except Exception as exc:  # noqa: BLE001
+            outcome["error"] = repr(exc)
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    assert ready.wait(timeout=10)
+
+    restore = backup.restore_backup(name, restore_documents=False)
+    assert restore["ok"] is True
+
+    proceed.set()
+    thread.join(timeout=10)
+
+    assert "error" not in outcome, outcome.get("error")
+    assert outcome.get("value") == "ok"
+    # Die Verbindung des Threads wurde tatsaechlich ersetzt.
+    assert outcome["before"] != outcome["after"]
+
+    # Auch ein direkter Schreibvorgang aus dem Hauptthread muss gehen.
+    db.execute(
+        "INSERT INTO learning_goals(id, title, target, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+        ("restore-goal", "Probe", "", db.now(), db.now()),
+    )
+    assert db.query_one("SELECT title FROM learning_goals WHERE id = ?", ("restore-goal",))["title"] == "Probe"
+
+    backup.delete_backup(name)
+
+
 def test_storage_report_enthaelt_kennzahlen():
     from app.services import backup
 

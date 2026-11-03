@@ -29,7 +29,6 @@ export default function SchematicEditorPage() {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 40, y: 40 });
   const [showGrid, setShowGrid] = useState(true);
-  const [wireColor] = useState("#1e293b");
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [message, setMessage] = useState<{ tone: "success" | "danger" | "warning"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
@@ -395,7 +394,6 @@ export default function SchematicEditorPage() {
             tool={tool}
             zoom={zoom}
             pan={pan}
-            wireColor={wireColor}
             showGrid={showGrid}
             onSelect={(selection, additive) =>
               editor.setSelection(additive ? [...editor.selection, ...selection] : selection)

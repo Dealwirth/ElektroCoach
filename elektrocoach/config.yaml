@@ -1,5 +1,5 @@
 name: "ElektroCoach"
-version: "1.0.4"
+version: "1.0.6"
 slug: "elektrocoach"
 description: "KI-Lernplattform für Elektroniker Energie- und Gebäudetechnik mit OCR-Import, Lernsystem, Prüfungssimulation und Schaltplan-Editor"
 url: "https://github.com/Dealwirth/ElektroCoach/tree/main/elektrocoach"
@@ -36,6 +36,9 @@ options:
   ollama_enabled: false
   ocr_languages: "deu+eng"
   ai_mode: "auto"
+  ai_timeout_seconds: 180
+  refine_after_import: false
+  refine_use_cloud: false
   ha_notify_service: ""
   mqtt_enabled: false
   mqtt_host: "core-mosquitto"
@@ -55,6 +58,9 @@ schema:
   ollama_enabled: "bool"
   ocr_languages: "str"
   ai_mode: "list(auto|local_only|cloud_only|off)"
+  ai_timeout_seconds: "int(30,900)"
+  refine_after_import: "bool"
+  refine_use_cloud: "bool"
   ha_notify_service: "str?"
   mqtt_enabled: "bool"
   mqtt_host: "str?"

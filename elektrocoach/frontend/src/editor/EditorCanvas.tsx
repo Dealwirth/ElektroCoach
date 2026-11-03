@@ -25,7 +25,6 @@ interface CanvasProps {
   tool: "select" | "wire" | "junction" | "pan";
   zoom: number;
   pan: { x: number; y: number };
-  wireColor: string;
   onSelect: (selection: Selection[], additive: boolean) => void;
   onMoveComponents: (updates: Array<{ id: string; patch: Partial<Component> }>) => void;
   onAddWire: (
@@ -55,7 +54,7 @@ interface DragState {
 
 export default function EditorCanvas(props: CanvasProps) {
   const {
-    state, symbols, selection, tool, zoom, pan, wireColor,
+    state, symbols, selection, tool, zoom, pan,
     onSelect, onMoveComponents, onAddWire, onUpdateWirePoints, onAddJunction,
     onPan, onZoom, onDoubleClickComponent, showGrid,
   } = props;
@@ -166,6 +165,9 @@ export default function EditorCanvas(props: CanvasProps) {
           startY: event.clientY,
           fromPin: { component_id: pin.component_id, pin_id: pin.pin_id },
         };
+        // Zeiger einfangen: sonst beendet ein Verlassen der Zeichenfläche die
+        // Leitung vorzeitig (onPointerLeave), obwohl der Anschluss noch folgt.
+        (event.target as Element).setPointerCapture?.(event.pointerId);
         const anchor = pinPosition(componentMap[pin.component_id], pin.pin_id, symbols);
         setPreview(anchor ?? world);
         return;
@@ -348,7 +350,7 @@ export default function EditorCanvas(props: CanvasProps) {
     <svg
       ref={svgRef}
       className="h-full w-full touch-none select-none"
-      style={{ background: "#fbfcfe" }}
+      style={{ background: "var(--canvas-bg)" }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -360,14 +362,19 @@ export default function EditorCanvas(props: CanvasProps) {
     >
       <defs>
         <pattern id="grid-minor" width={GRID} height={GRID} patternUnits="userSpaceOnUse">
-          <path d={`M ${GRID} 0 L 0 0 0 ${GRID}`} fill="none" stroke="#e6ebf2" strokeWidth="1" />
+          <path
+            d={`M ${GRID} 0 L 0 0 0 ${GRID}`}
+            fill="none"
+            stroke="var(--canvas-grid-minor)"
+            strokeWidth="1"
+          />
         </pattern>
         <pattern id="grid-major" width={GRID * 5} height={GRID * 5} patternUnits="userSpaceOnUse">
           <rect width={GRID * 5} height={GRID * 5} fill="url(#grid-minor)" />
           <path
             d={`M ${GRID * 5} 0 L 0 0 0 ${GRID * 5}`}
             fill="none"
-            stroke="#cfd8e3"
+            stroke="var(--canvas-grid-major)"
             strokeWidth="1"
           />
         </pattern>
@@ -379,7 +386,7 @@ export default function EditorCanvas(props: CanvasProps) {
           y={-4000}
           width={12000}
           height={12000}
-          fill={showGrid ? "url(#grid-major)" : "#fbfcfe"}
+          fill={showGrid ? "url(#grid-major)" : "var(--canvas-bg)"}
         />
 
         {/* Leitungen */}
@@ -388,12 +395,16 @@ export default function EditorCanvas(props: CanvasProps) {
           if (path.length < 2) return null;
           const selected = selectedWireIds.has(wire.id);
           const d = path.map((point, index) => `${index === 0 ? "M" : "L"}${point.x} ${point.y}`).join(" ");
+          // Die Standardfarbe Schwarz wird in der dunklen Betriebsart durch
+          // eine helle Farbe ersetzt, sonst wären Leitungen unsichtbar.
+          const baseColor =
+            wire.color && wire.color !== "#1e293b" ? wire.color : "var(--canvas-wire)";
           return (
             <g key={wire.id}>
               <path
                 d={d}
                 fill="none"
-                stroke={selected ? "#1b6ff5" : wire.color || wireColor}
+                stroke={selected ? "#1b6ff5" : baseColor}
                 strokeWidth={selected ? 4 : 2.5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -405,8 +416,8 @@ export default function EditorCanvas(props: CanvasProps) {
                   cx={point.x}
                   cy={point.y}
                   r={selected ? 4.5 : 3}
-                  fill="#fff"
-                  stroke={selected ? "#1b6ff5" : "#475569"}
+                  fill="var(--canvas-bg)"
+                  stroke={selected ? "#1b6ff5" : "var(--canvas-label)"}
                   strokeWidth="1.5"
                 />
               ))}
@@ -439,7 +450,7 @@ export default function EditorCanvas(props: CanvasProps) {
 
         {/* Verbindungspunkte */}
         {state.junctions.map((junction) => (
-          <circle key={junction.id} cx={junction.x} cy={junction.y} r="6" fill="#0f172a" />
+          <circle key={junction.id} cx={junction.x} cy={junction.y} r="6" fill="var(--canvas-ink)" />
         ))}
 
         {/* Pin-Hervorhebung */}

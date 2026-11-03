@@ -16,7 +16,7 @@ import {
   formatBytes,
   formatDate,
 } from "../components/ui";
-import type { ImportJob } from "../types";
+import type { ImportJob, RefineJob } from "../types";
 
 interface Formats {
   samsung_direct: { supported: boolean; suffixes: string[]; note: string };
@@ -34,8 +34,22 @@ export default function ImportPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "success" | "danger" | "warning"; text: string } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [refineJobs, setRefineJobs] = useState<RefineJob[]>([]);
+  const [activeRefine, setActiveRefine] = useState<RefineJob | null>(null);
+  const [refineBusy, setRefineBusy] = useState(false);
+  const [refineMessage, setRefineMessage] = useState<{ tone: "success" | "danger" | "warning"; text: string } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const pollRef = useRef<number | null>(null);
+  const refinePollRef = useRef<number | null>(null);
+
+  const loadRefineJobs = useCallback(async () => {
+    try {
+      const data = await api.refineJobs(10);
+      setRefineJobs(data.items);
+    } catch {
+      /* Liste ist nicht kritisch */
+    }
+  }, []);
 
   const loadJobs = useCallback(async () => {
     try {
@@ -52,7 +66,8 @@ export default function ImportPage() {
       .then((data) => setFormats(data as unknown as Formats))
       .catch(() => undefined);
     loadJobs();
-  }, [loadJobs]);
+    loadRefineJobs();
+  }, [loadJobs, loadRefineJobs]);
 
   useEffect(() => {
     if (!activeJob || ["done", "error", "cancelled"].includes(activeJob.status)) {
@@ -77,6 +92,30 @@ export default function ImportPage() {
       if (pollRef.current) window.clearInterval(pollRef.current);
     };
   }, [activeJob, loadJobs]);
+
+  useEffect(() => {
+    if (!activeRefine || ["done", "error", "cancelled"].includes(activeRefine.status)) {
+      if (refinePollRef.current) {
+        window.clearInterval(refinePollRef.current);
+        refinePollRef.current = null;
+      }
+      return;
+    }
+    refinePollRef.current = window.setInterval(async () => {
+      try {
+        const job = await api.refineJob(activeRefine.id);
+        setActiveRefine(job);
+        if (["done", "error", "cancelled"].includes(job.status)) {
+          loadRefineJobs();
+        }
+      } catch {
+        /* kurze Netzfehler ignorieren */
+      }
+    }, 1500);
+    return () => {
+      if (refinePollRef.current) window.clearInterval(refinePollRef.current);
+    };
+  }, [activeRefine, loadRefineJobs]);
 
   const addFiles = (incoming: FileList | File[]) => {
     const list = Array.from(incoming);
@@ -137,8 +176,34 @@ export default function ImportPage() {
     }
   };
 
-  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+  const startRefine = async (scope: "review" | "document", documentId?: string | null) => {
+    setRefineBusy(true);
+    setRefineMessage(null);
+    try {
+      const result = await api.startRefine(documentId ?? null, scope);
+      const job = await api.refineJob(result.job_id);
+      setActiveRefine(job);
+      setRefineMessage({ tone: "success", text: "Nachbearbeitung gestartet." });
+      loadRefineJobs();
+    } catch (error) {
+      setRefineMessage({ tone: "danger", text: error instanceof ApiError ? error.message : String(error) });
+    } finally {
+      setRefineBusy(false);
+    }
+  };
 
+  const cancelRefine = async (id: string) => {
+    try {
+      await api.cancelRefine(id);
+      const job = await api.refineJob(id);
+      setActiveRefine(job);
+      loadRefineJobs();
+    } catch (error) {
+      setRefineMessage({ tone: "danger", text: error instanceof ApiError ? error.message : String(error) });
+    }
+  };
+
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
   return (
     <div className="space-y-6">
       <PageHeader
@@ -332,6 +397,70 @@ export default function ImportPage() {
           )}
         </div>
       </div>
+
+      <Card>
+        <SectionTitle
+          title="KI-Nachbearbeitung erkannter Texte"
+          subtitle="Verbessert unsicher erkannte Seiten mit dem lokalen Modell (kostenlos, offline)."
+        />
+        <div className="space-y-3">
+          <p className="text-xs text-ink-500">
+            Die Nachbearbeitung korrigiert OCR-Fehler und Formeln. Sie ist optional: Bibliothek, Lernen und
+            Schaltplan-Editor funktionieren auch ohne KI vollständig.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => startRefine("review")}
+              disabled={refineBusy}
+            >
+              Unsichere Seiten nachbearbeiten
+            </button>
+            <button type="button" className="btn-ghost" onClick={loadRefineJobs} disabled={refineBusy}>
+              Status aktualisieren
+            </button>
+          </div>
+          {refineMessage && <Alert tone={refineMessage.tone}>{refineMessage.text}</Alert>}
+          {activeRefine && (
+            <div className="space-y-2 rounded-xl bg-ink-50 p-3">
+              <div className="flex items-center justify-between">
+                <StatusBadge status={activeRefine.status} />
+                <span className="text-xs text-ink-500">
+                  {activeRefine.processed_pages} / {activeRefine.total_pages}
+                </span>
+              </div>
+              <ProgressBar
+                value={
+                  activeRefine.progress_percent ??
+                  (activeRefine.processed_pages / Math.max(1, activeRefine.total_pages)) * 100
+                }
+              />
+              {activeRefine.message && <p className="text-xs text-ink-600">{activeRefine.message}</p>}
+              {!["done", "error", "cancelled"].includes(activeRefine.status) && (
+                <button type="button" className="btn-secondary btn-sm" onClick={() => cancelRefine(activeRefine.id)}>
+                  Nachbearbeitung abbrechen
+                </button>
+              )}
+            </div>
+          )}
+          {refineJobs.length > 0 && (
+            <details className="text-xs">
+              <summary className="cursor-pointer text-ink-600">Verlauf der Nachbearbeitungen</summary>
+              <ul className="mt-2 space-y-1">
+                {refineJobs.map((job) => (
+                  <li key={job.id} className="flex justify-between gap-2 text-ink-600">
+                    <span className="truncate">{formatDate(job.created_at)}</span>
+                    <span>
+                      {job.status} · {job.processed_pages}/{job.total_pages}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      </Card>
 
       <Card>
         <SectionTitle

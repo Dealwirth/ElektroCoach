@@ -271,6 +271,16 @@ export const api = {
   aiUsage: () => request<Record<string, unknown>>("ai/usage"),
   ollamaModels: () => request<Record<string, unknown>>("ai/ollama/models"),
   geminiModels: () => request<Record<string, unknown>>("ai/gemini/models"),
+  ollamaAddon: () => request<import("./types").OllamaAddonStatus>("ai/ollama/addon"),
+  ollamaAddonEnsure: () =>
+    request<import("./types").OllamaAddonEnsure>("ai/ollama/addon/ensure", { method: "POST" }),
+  ollamaPull: (model: string) =>
+    request<{ ok: boolean; model: string }>("ai/ollama/pull", {
+      method: "POST",
+      body: JSON.stringify({ model }),
+    }),
+  ollamaInstalled: () =>
+    request<{ ok: boolean; models: string[]; url?: string; error?: string }>("ai/ollama/installed"),
   chat: (message: string, useLibrary = true) =>
     request<{
       ok: boolean;
@@ -287,6 +297,25 @@ export const api = {
     request<{ ok: boolean; answer?: string; error?: string; provider?: string }>("ai/explain", {
       method: "POST",
       body: JSON.stringify({ question, topic_id: topicId ?? null, level }),
+    }),
+
+  // KI-Nachbearbeitung erkannter Texte
+  startRefine: (documentId?: string | null, scope: "review" | "document" = "review") =>
+    request<{ ok: boolean; job_id: string; scope: string }>("ai/refine", {
+      method: "POST",
+      body: JSON.stringify({ document_id: documentId ?? null, scope }),
+    }),
+  refineJobs: (limit = 10) =>
+    request<{ items: import("./types").RefineJob[]; queue: number }>(
+      `ai/refine/jobs${query({ limit })}`,
+    ),
+  refineJob: (id: string) => request<import("./types").RefineJob>(`ai/refine/jobs/${id}`),
+  cancelRefine: (id: string) =>
+    request<{ ok: boolean }>(`ai/refine/jobs/${id}/cancel`, { method: "POST" }),
+  refinePage: (pageId: string) =>
+    request<import("./types").RefineResult>("ai/refine/page", {
+      method: "POST",
+      body: JSON.stringify({ page_id: pageId }),
     }),
 
   // Home Assistant

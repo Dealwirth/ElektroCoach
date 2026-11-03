@@ -9,7 +9,7 @@
 import type { Component, SymbolDef } from "../types";
 import { componentPins } from "./useEditor";
 
-const STROKE = "#0f172a";
+const STROKE = "var(--canvas-ink)";
 
 function Body({ symbol }: { symbol: SymbolDef }) {
   const { width: w, height: h } = symbol;
@@ -55,7 +55,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "fuse":
       return (
         <g>
-          <rect x="16" y={mid - 9} width={w - 32} height="18" rx="4" fill="#fff" />
+          <rect x="16" y={mid - 9} width={w - 32} height="18" rx="4" fill="var(--canvas-bg)" />
           <line x1="0" y1={mid} x2="16" y2={mid} />
           <line x1={w - 16} y1={mid} x2={w} y2={mid} />
         </g>
@@ -63,7 +63,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "mcb":
       return (
         <g>
-          <rect x="18" y={mid - 20} width={w - 36} height="40" rx="4" fill="#fff" />
+          <rect x="18" y={mid - 20} width={w - 36} height="40" rx="4" fill="var(--canvas-bg)" />
           <line x1="0" y1={mid} x2="18" y2={mid} />
           <line x1={w - 18} y1={mid} x2={w} y2={mid} />
           <line x1={w / 2} y1={mid - 12} x2={w / 2 + 8} y2={mid + 6} />
@@ -73,7 +73,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "rcd":
       return (
         <g>
-          <rect x="16" y="12" width={w - 32} height={h - 24} rx="5" fill="#fff" />
+          <rect x="16" y="12" width={w - 32} height={h - 24} rx="5" fill="var(--canvas-bg)" />
           {[20, 40, 60, 80].map((y) => (
             <g key={y}>
               <line x1="0" y1={y} x2="16" y2={y} />
@@ -87,7 +87,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "relay":
       return (
         <g>
-          <rect x="16" y="8" width={w - 32} height={h - 16} rx="4" fill="#fff" />
+          <rect x="16" y="8" width={w - 32} height={h - 16} rx="4" fill="var(--canvas-bg)" />
           <line x1="0" y1="20" x2="16" y2="20" />
           <line x1="0" y1="40" x2="16" y2="40" />
           <line x1={w - 16} y1="20" x2={w} y2="20" />
@@ -98,7 +98,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "contactor":
       return (
         <g>
-          <rect x="16" y="8" width={w - 32} height={h - 16} rx="4" fill="#fff" />
+          <rect x="16" y="8" width={w - 32} height={h - 16} rx="4" fill="var(--canvas-bg)" />
           {[20, 60].map((y) => (
             <g key={y}>
               <line x1="0" y1={y} x2="16" y2={y} />
@@ -115,7 +115,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "motor":
       return (
         <g>
-          <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2 - 4} fill="#fff" />
+          <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2 - 4} fill="var(--canvas-bg)" />
           <text x={w / 2} y={h / 2 + 5} textAnchor="middle" fontSize="14" fill={STROKE}>
             M
           </text>
@@ -127,7 +127,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "lamp":
       return (
         <g>
-          <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2 - 6} fill="#fff" />
+          <circle cx={w / 2} cy={h / 2} r={Math.min(w, h) / 2 - 6} fill="var(--canvas-bg)" />
           <line x1={w / 2 - 12} y1={h / 2 - 12} x2={w / 2 + 12} y2={h / 2 + 12} />
           <line x1={w / 2 - 12} y1={h / 2 + 12} x2={w / 2 + 12} y2={h / 2 - 12} />
           <line x1="0" y1={h / 2} x2={w / 2 - Math.min(w, h) / 2 + 6} y2={h / 2} />
@@ -137,7 +137,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "socket":
       return (
         <g>
-          <path d={`M2 ${h - 2} A ${w / 2} ${h - 4} 0 0 1 ${w - 2} ${h - 2} Z`} fill="#fff" />
+          <path d={`M2 ${h - 2} A ${w / 2} ${h - 4} 0 0 1 ${w - 2} ${h - 2} Z`} fill="var(--canvas-bg)" />
           <line x1="0" y1="15" x2="12" y2="15" />
           <line x1="0" y1="30" x2="12" y2="30" />
           <line x1="0" y1="45" x2="12" y2="45" />
@@ -147,7 +147,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "terminal":
       return (
         <g>
-          <circle cx={w / 2} cy={h / 2} r="7" fill="#fff" />
+          <circle cx={w / 2} cy={h / 2} r="7" fill="var(--canvas-bg)" />
           <line x1="0" y1={h / 2} x2={w / 2 - 7} y2={h / 2} />
           <line x1={w / 2 + 7} y1={h / 2} x2={w} y2={h / 2} />
         </g>
@@ -173,7 +173,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "heater":
       return (
         <g>
-          <rect x="14" y={mid - 12} width={w - 28} height="24" rx="3" fill="#fff" />
+          <rect x="14" y={mid - 12} width={w - 28} height="24" rx="3" fill="var(--canvas-bg)" />
           <path
             d={`M20 ${mid - 8} L28 ${mid + 8} L36 ${mid - 8} L44 ${mid + 8} L52 ${mid - 8}`}
             fill="none"
@@ -185,7 +185,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "temperature_sensor":
       return (
         <g>
-          <rect x="16" y={mid - 12} width={w - 32} height="24" rx="3" fill="#fff" />
+          <rect x="16" y={mid - 12} width={w - 32} height="24" rx="3" fill="var(--canvas-bg)" />
           <text x={w / 2} y={mid + 5} textAnchor="middle" fontSize="12" fill={STROKE}>
             T
           </text>
@@ -196,7 +196,7 @@ function Body({ symbol }: { symbol: SymbolDef }) {
     case "text":
       return null;
     default:
-      return <rect x="0" y="0" width={w} height={h} rx="4" fill="#fff" />;
+      return <rect x="0" y="0" width={w} height={h} rx="4" fill="var(--canvas-bg)" />;
   }
 }
 
@@ -256,7 +256,7 @@ export function SymbolShape({
             y={symbol.height + 15}
             textAnchor="middle"
             fontSize="12"
-            fill="#475569"
+            fill="var(--canvas-label)"
             fontFamily="Helvetica, Arial, sans-serif"
           >
             {component.label}
@@ -271,7 +271,7 @@ export function SymbolShape({
               cx={pin.x - component.x}
               cy={pin.y - component.y}
               r="4.5"
-              fill="#fff"
+              fill="var(--canvas-bg)"
               stroke={STROKE}
               strokeWidth="1.6"
             />

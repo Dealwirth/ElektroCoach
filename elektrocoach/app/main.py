@@ -9,6 +9,7 @@ funktioniert.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -16,7 +17,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import db
@@ -24,7 +25,7 @@ from . import __version__
 from .config import settings
 from .routers import ai_api, exams, imports, learning_api, schematics, system
 from .services import backup, ha_integration, learning
-from .workers import import_worker
+from .workers import import_worker, refine_worker
 
 LOG_LEVELS = {
     "debug": logging.DEBUG, "info": logging.INFO,
@@ -60,6 +61,7 @@ async def lifespan(app: FastAPI):
     learning.ensure_default_topics()
     import_worker.start_worker()
     import_worker.resume_interrupted_jobs()
+    refine_worker.start_worker()
     ha_integration.start_scheduler()
     backup.maybe_auto_backup()
     log.info("ElektroCoach bereit. Datenverzeichnis: %s", settings.data_dir)
@@ -71,7 +73,7 @@ async def lifespan(app: FastAPI):
             ha_integration.remove_discovery()
         except Exception:  # noqa: BLE001
             pass
-        db.checkpoint()
+        db.checkpoint_quiet()
         log.info("ElektroCoach beendet.")
 
 
@@ -162,25 +164,56 @@ def _index_file() -> Path | None:
     return index if index.exists() else None
 
 
-@app.get("/", include_in_schema=False)
-async def index() -> Response:
+# Home Assistant liefert die Oberflaeche unter /api/hassio_ingress/<token>/...
+# aus, entfernt das Praefix aber aus dem Pfad und uebergibt es im Kopf
+# X-Ingress-Path. Der Wert ist pro Neustart anders.
+def _base_href(request: Request) -> str:
+    """Ermittelt den Basispfad fuer das <base>-Element.
+
+    Quelle ist der Kopf X-Ingress-Path (so liefert Home Assistant den Pfad).
+    Ohne Ingress ist der Basispfad "/". Der Wert wird serverseitig in den Kopf
+    der Seite geschrieben. Das ist wichtig: der Browser liest <base> schon beim
+    Vorabladen (Preload-Scanner). Wird <base> erst per JavaScript gesetzt,
+    laedt Chromium die Dateien in ./assets gegen die falsche, verschachtelte
+    Adresse (z. B. /schaltplan/editor/assets/...). Die Folge waere ein
+    fehlendes Stylesheet.
+    """
+    header = (request.headers.get("X-Ingress-Path") or "").strip("/")
+    return f"/{header}/" if header else "/"
+
+
+def _render_index(request: Request) -> Response:
     index_file = _index_file()
-    if index_file:
-        return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
-    return JSONResponse(
-        status_code=503,
-        content={
-            "detail": "Weboberflaeche nicht gebaut",
-            "hint": (
-                "Das Frontend wurde nicht in das Image kopiert. Bitte das Image "
-                "vollstaendig bauen (npm run build im Ordner frontend)."
-            ),
-        },
-    )
+    if not index_file:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Weboberflaeche nicht gebaut",
+                "hint": (
+                    "Das Frontend wurde nicht in das Image kopiert. Bitte das Image "
+                    "vollstaendig bauen (npm run build im Ordner frontend)."
+                ),
+            },
+        )
+    html = index_file.read_text(encoding="utf-8")
+    base = f'<base href="{_base_href(request)}" />'
+    # Nur echte base-Elemente treffen (Attribut vorhanden), nicht Erwaehnungen
+    # in Kommentaren wie "base-Element".
+    base_tag_re = re.compile(r"<base\s[^>]*>", re.IGNORECASE)
+    if base_tag_re.search(html):
+        html = base_tag_re.sub(base, html, count=1)
+    else:
+        html = re.sub(r"(<head[^>]*>)", r"\1\n    " + base, html, count=1, flags=re.IGNORECASE)
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache"})
+
+
+@app.get("/", include_in_schema=False)
+async def index(request: Request) -> Response:
+    return _render_index(request)
 
 
 @app.get("/{full_path:path}", include_in_schema=False)
-async def spa_fallback(full_path: str) -> Response:
+async def spa_fallback(full_path: str, request: Request) -> Response:
     """Liefert die SPA aus. Unbekannte Pfade ohne API-Praefix werden auf die
     Startseite geleitet, damit die Oberflaeche nach einem Neuladen funktioniert."""
     if full_path.startswith("api/"):
@@ -188,16 +221,4 @@ async def spa_fallback(full_path: str) -> Response:
     candidate = (STATIC_DIR / full_path).resolve()
     if str(candidate).startswith(str(STATIC_DIR.resolve())) and candidate.is_file():
         return FileResponse(candidate)
-    index_file = _index_file()
-    if index_file:
-        return FileResponse(index_file, headers={"Cache-Control": "no-cache"})
-    return JSONResponse(
-        status_code=503,
-        content={
-            "detail": "Weboberflaeche nicht gebaut",
-            "hint": (
-                "Das Frontend wurde nicht in das Image kopiert. Bitte das Image "
-                "vollstaendig bauen (npm run build im Ordner frontend)."
-            ),
-        },
-    )
+    return _render_index(request)

@@ -23,6 +23,12 @@ configuration:
   ai_mode:
     name: "KI-Modus"
     description: "auto = lokal zuerst, Cloud nur wenn nötig; local_only; cloud_only; off."
+  refine_after_import:
+    name: "Nach dem Import nachbearbeiten"
+    description: "Startet die KI-Nachbearbeitung erkannter Texte automatisch, sobald eine KI erreichbar ist."
+  refine_use_cloud:
+    name: "Nachbearbeitung über Gemini erlauben"
+    description: "Wenn aktiv, darf die Nachbearbeitung auch das kostenlose Gemini-Kontingent nutzen. Standard: nur lokal über Ollama."
   ha_notify_service:
     name: "Benachrichtigungsdienst"
     description: "Optionaler notify-Dienst, z. B. notify.mobile_app_mein_handy."

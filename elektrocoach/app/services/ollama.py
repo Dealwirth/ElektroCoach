@@ -33,7 +33,7 @@ _TIMEOUT = httpx.Timeout(connect=5.0, read=180.0, write=30.0, pool=5.0)
 
 def _timeout() -> httpx.Timeout:
     """Zeitlimit aus den Einstellungen."""
-    total = max(5, settings.get_int("ai_timeout_seconds", 60))
+    total = max(5, settings.get_int("ai_timeout_seconds", 180))
     return httpx.Timeout(connect=min(5.0, total), read=float(total), write=30.0, pool=5.0)
 
 

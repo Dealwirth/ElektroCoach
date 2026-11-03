@@ -8,7 +8,16 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from ..services import ai_router, ai_usage, gemini, ha_integration, learning, ollama
+from ..services import (
+    ai_router,
+    ai_usage,
+    gemini,
+    ha_integration,
+    learning,
+    ollama,
+    ollama_addon,
+)
+from ..workers import refine_worker
 
 log = logging.getLogger(__name__)
 
@@ -183,4 +192,126 @@ async def ha_notify_due() -> dict[str, Any]:
     result = await ha_integration.notify_due_reviews()
     if not result.get("ok"):
         raise HTTPException(status_code=400, detail=result.get("error", "Fehler"))
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Ollama-Add-on (lokale, kostenlose KI)
+# ---------------------------------------------------------------------------
+@router.get("/ai/ollama/addon")
+async def ollama_addon_status() -> dict[str, Any]:
+    """Zustand des Ollama-Add-ons im Supervisor."""
+    return await ollama_addon.status()
+
+
+@router.post("/ai/ollama/addon/ensure")
+async def ollama_addon_ensure() -> dict[str, Any]:
+    """Installiert und startet das Ollama-Add-on und hinterlegt die Adresse."""
+    result = await ollama_addon.ensure_running()
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Fehler"))
+    return result
+
+
+class PullRequest(BaseModel):
+    model: str = Field(min_length=1, max_length=120)
+
+
+@router.post("/ai/ollama/pull")
+async def ollama_pull(payload: PullRequest) -> dict[str, Any]:
+    """Laedt ein Modell in das Ollama-Add-on (kostenlos, lokal)."""
+    result = await ollama_addon.pull_model(payload.model)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Fehler"))
+    return result
+
+
+@router.get("/ai/ollama/installed")
+async def ollama_installed() -> dict[str, Any]:
+    return await ollama_addon.installed_models()
+
+
+# ---------------------------------------------------------------------------
+# KI-Nachbearbeitung erkannter Texte
+# ---------------------------------------------------------------------------
+class RefineRequest(BaseModel):
+    document_id: str | None = None
+    scope: str = "review"
+
+
+@router.post("/ai/refine")
+async def start_refine(payload: RefineRequest) -> dict[str, Any]:
+    """Startet die KI-Nachbearbeitung (Ollama, bei Bedarf Gemini).
+
+    scope "document": alle Seiten eines Dokuments.
+    scope "review":   alle zur Pruefung markierten Seiten.
+    """
+    scope = payload.scope if payload.scope in {"document", "review"} else "review"
+    if scope == "document" and not payload.document_id:
+        raise HTTPException(status_code=400, detail="document_id fehlt")
+    if scope == "review" and payload.document_id:
+        scope = "document"
+    status = await ai_router.status()
+    if not status.get("any_available"):
+        raise HTTPException(
+            status_code=400,
+            detail="Keine KI erreichbar. Bitte Ollama einrichten oder einen Gemini-Schluessel hinterlegen.",
+        )
+    job_id = refine_worker.create_job(payload.document_id, scope)
+    refine_worker.enqueue(job_id)
+    return {"ok": True, "job_id": job_id, "scope": scope}
+
+
+@router.get("/ai/refine/jobs")
+async def list_refine_jobs(limit: int = 10) -> dict[str, Any]:
+    from .. import db
+
+    rows = db.query(
+        "SELECT id, document_id, scope, status, total_pages, processed_pages, current_page, "
+        "message, created_at, updated_at FROM refine_jobs ORDER BY created_at DESC LIMIT ?",
+        (max(1, min(50, limit)),),
+    )
+    return {"items": [dict(r) for r in rows], "queue": refine_worker.queue_length()}
+
+
+@router.get("/ai/refine/jobs/{job_id}")
+async def get_refine_job(job_id: str) -> dict[str, Any]:
+    data = refine_worker.job(job_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Auftrag nicht gefunden")
+    total = data.get("total_pages") or 0
+    data["progress_percent"] = (
+        round(100 * (data.get("processed_pages") or 0) / total, 1) if total else 0.0
+    )
+    return data
+
+
+@router.post("/ai/refine/jobs/{job_id}/cancel")
+async def cancel_refine_job(job_id: str) -> dict[str, Any]:
+    if not refine_worker.request_cancel(job_id):
+        raise HTTPException(status_code=400, detail="Auftrag kann nicht abgebrochen werden")
+    return {"ok": True, "message": "Abbruch angefordert"}
+
+
+class RefinePageRequest(BaseModel):
+    page_id: str = Field(min_length=1, max_length=64)
+
+
+@router.post("/ai/refine/page")
+async def refine_single_page(payload: RefinePageRequest) -> dict[str, Any]:
+    """Bearbeitet eine einzelne Seite sofort nach (fuer die Pruefansicht)."""
+    from .. import db
+    from ..services import refine
+
+    row = db.query_one(
+        "SELECT id, document_id, page_number, text, image_path, needs_review "
+        "FROM pages WHERE id = ?",
+        (payload.page_id,),
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Seite nicht gefunden")
+    result = await refine.refine_page(dict(row))
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Fehler"))
+    refine.apply_result(result)
     return result

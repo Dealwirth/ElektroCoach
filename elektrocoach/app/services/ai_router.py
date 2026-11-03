@@ -88,6 +88,10 @@ async def complete(
         order = ["ollama", "gemini"] if prefer_local else ["gemini", "ollama"]
     if not external_allowed:
         order = [provider for provider in order if provider != "gemini"]
+    # Nachbearbeitung: Cloud nur, wenn ausdruecklich freigegeben. Sonst bleibt
+    # der lokale Weg (Ollama) die einzige Quelle.
+    if task.startswith("ocr_refine") and not settings.get_bool("refine_use_cloud", False):
+        order = [provider for provider in order if provider != "gemini"]
 
     errors: list[str] = []
     for provider in order:

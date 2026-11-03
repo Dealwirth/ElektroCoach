@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { api } from "./api";
 import { Alert } from "./components/ui";
+import { useIsDark } from "./theme";
 import DashboardPage from "./pages/DashboardPage";
 import ImportPage from "./pages/ImportPage";
 import LibraryPage from "./pages/LibraryPage";
@@ -61,6 +62,9 @@ export default function App() {
   const [aiWarning, setAiWarning] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  // Hält die Oberfläche mit der Hell-/Dunkel-Einstellung von Home Assistant
+  // synchron, auch wenn dort umgeschaltet wird, ohne die Seite neu zu laden.
+  useIsDark();
 
   useEffect(() => {
     let active = true;

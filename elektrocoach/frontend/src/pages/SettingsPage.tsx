@@ -11,8 +11,9 @@ import {
   Tabs,
   useAsync,
 } from "../components/ui";
+import { getThemeMode, setThemeMode, type ThemeMode } from "../theme";
 
-type TabId = "ki" | "homeassistant" | "lernen" | "import" | "sicherheit";
+type TabId = "ki" | "homeassistant" | "darstellung" | "lernen" | "import" | "sicherheit";
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<TabId>("ki");
@@ -72,6 +73,7 @@ export default function SettingsPage() {
         tabs={[
           { id: "ki", label: "KI-Dienste" },
           { id: "homeassistant", label: "Home Assistant" },
+          { id: "darstellung", label: "Darstellung" },
           { id: "lernen", label: "Lernen" },
           { id: "import", label: "Import & OCR" },
           { id: "sicherheit", label: "Sicherheit" },
@@ -84,6 +86,7 @@ export default function SettingsPage() {
       {tab === "homeassistant" && (
         <HaSettings values={values} set={set} save={save} busy={busy} />
       )}
+      {tab === "darstellung" && <AppearanceSettings />}
       {tab === "lernen" && <LearnSettings values={values} set={set} save={save} busy={busy} />}
       {tab === "import" && <ImportSettings values={values} set={set} save={save} busy={busy} />}
       {tab === "sicherheit" && <SecuritySettings values={values} set={set} save={save} busy={busy} />}
@@ -96,6 +99,100 @@ interface TabProps {
   set: (key: string, value: unknown) => void;
   save: (keys: string[]) => void;
   busy: boolean;
+}
+
+/**
+ * Darstellung: Hell/Dunkel.
+ *
+ * Standard ist "automatisch": die Oberfläche folgt der Einstellung von Home
+ * Assistant. Wer Home Assistant im hellen Design nutzt, aber diese Oberfläche
+ * dunkel möchte, kann hier ausdrücklich umschalten.
+ */
+function AppearanceSettings() {
+  const [mode, setMode] = useState<ThemeMode>(() => getThemeMode());
+
+  const choose = (value: ThemeMode) => {
+    setMode(value);
+    setThemeMode(value);
+  };
+
+  const options: Array<{ id: ThemeMode; label: string; hint: string }> = [
+    { id: "auto", label: "Automatisch", hint: "Übernimmt die Einstellung von Home Assistant." },
+    { id: "light", label: "Immer hell", hint: "Unabhängig von Home Assistant." },
+    { id: "dark", label: "Immer dunkel", hint: "Unabhängig von Home Assistant." },
+  ];
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <Card>
+        <SectionTitle
+          title="Farbdarstellung"
+          subtitle="Die Oberfläche kann dem hellen oder dunklen Design von Home Assistant folgen."
+        />
+        <div className="space-y-2">
+          {options.map((option) => (
+            <label
+              key={option.id}
+              className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors ${
+                mode === option.id
+                  ? "border-brand-500 bg-brand-50"
+                  : "border-ink-200 hover:bg-ink-50"
+              }`}
+            >
+              <input
+                type="radio"
+                name="theme-mode"
+                className="mt-0.5 h-4 w-4"
+                checked={mode === option.id}
+                onChange={() => choose(option.id)}
+              />
+              <span>
+                <span className="block text-sm font-medium text-ink-900">{option.label}</span>
+                <span className="mt-0.5 block text-xs text-ink-500">{option.hint}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <p className="mt-4 text-xs text-ink-500">
+          Die Einstellung gilt für dieses Gerät und diesen Browser. Beim Umschalten in Home
+          Assistant ändert sich die Darstellung hier automatisch mit.
+        </p>
+      </Card>
+
+      <Card>
+        <SectionTitle title="Vorschau" subtitle="So sehen die Bausteine in der aktuellen Betriebsart aus." />
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <span className="badge-brand">Thema</span>
+            <span className="badge-success">Richtig</span>
+            <span className="badge-warning">Zu prüfen</span>
+            <span className="badge-danger">Fehler</span>
+            <span className="badge-neutral">Neutral</span>
+          </div>
+          <div className="rounded-xl border border-ink-200 bg-white p-3.5">
+            <p className="text-sm font-semibold text-ink-900">Karte mit Text</p>
+            <p className="mt-1 text-sm text-ink-500">
+              Fließtext in der Nebenschriftfarbe, gut lesbar in beiden Betriebsarten.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-primary btn-sm">
+              Hauptaktion
+            </button>
+            <button type="button" className="btn-secondary btn-sm">
+              Nebenaktion
+            </button>
+            <button type="button" className="btn-ghost btn-sm">
+              Leise
+            </button>
+          </div>
+          <Alert tone="info" title="Hinweis">
+            Meldungen passen sich ebenfalls automatisch an.
+          </Alert>
+        </div>
+      </Card>
+    </div>
+  );
 }
 
 function Text({ id, label, value, onChange, hint, type = "text" }: {
@@ -178,14 +275,114 @@ function Toggle({ id, label, checked, onChange, hint }: {
 function KiSettings({ values, set, save, busy }: TabProps) {
   const [status, setStatus] = useState<import("../types").AiStatus | null>(null);
   const [models, setModels] = useState<Record<string, unknown> | null>(null);
+  const [addon, setAddon] = useState<import("../types").OllamaAddonStatus | null>(null);
+  const [addonBusy, setAddonBusy] = useState(false);
+  const [pullModel, setPullModel] = useState("");
+  const [pullBusy, setPullBusy] = useState(false);
+  const [addonMessage, setAddonMessage] = useState<{ tone: "success" | "danger" | "warning"; text: string } | null>(null);
+
+  const loadAddon = () => {
+    api.ollamaAddon().then(setAddon).catch(() => undefined);
+    api.ollamaInstalled().then((result) => setModels({ models: result.models })).catch(() => undefined);
+  };
 
   useEffect(() => {
     api.aiStatus().then(setStatus).catch(() => undefined);
     api.ollamaModels().then(setModels).catch(() => undefined);
+    loadAddon();
   }, []);
+
+  const setupAddon = async () => {
+    setAddonBusy(true);
+    setAddonMessage(null);
+    try {
+      const result = await api.ollamaAddonEnsure();
+      if (result.reachable) {
+        setAddonMessage({
+          tone: "success",
+          text: result.created
+            ? "Ollama-Add-on installiert und gestartet. Adresse wurde übernommen."
+            : "Ollama-Add-on läuft. Adresse wurde übernommen.",
+        });
+      } else {
+        setAddonMessage({
+          tone: "warning",
+          text: result.error || "Add-on läuft, antwortet aber noch nicht. Bitte kurz warten.",
+        });
+      }
+      loadAddon();
+      set("ollama_enabled", true);
+      if (result.url) set("ollama_url", result.url);
+    } catch (error) {
+      setAddonMessage({ tone: "danger", text: error instanceof ApiError ? error.message : String(error) });
+    } finally {
+      setAddonBusy(false);
+    }
+  };
+
+  const doPull = async () => {
+    const model = pullModel.trim();
+    if (!model) return;
+    setPullBusy(true);
+    setAddonMessage(null);
+    try {
+      await api.ollamaPull(model);
+      setAddonMessage({ tone: "success", text: `Modell ${model} geladen.` });
+      setPullModel("");
+      loadAddon();
+    } catch (error) {
+      setAddonMessage({ tone: "danger", text: error instanceof ApiError ? error.message : String(error) });
+    } finally {
+      setPullBusy(false);
+    }
+  };
+
+  const addonInstalled = Boolean(addon?.installed);
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
+      <Card className="lg:col-span-2">
+        <SectionTitle
+          title="Ollama automatisch einrichten"
+          subtitle="Installiert und startet das Ollama-Add-on und übernimmt die richtige Adresse."
+        />
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="badge-neutral">Supervisor: {addon?.supervisor ? "verfügbar" : "nicht verfügbar"}</span>
+            <span className="badge-neutral">Add-on: {addonInstalled ? "installiert" : "nicht installiert"}</span>
+            {addon?.state && <span className="badge-neutral">Status: {addon.state}</span>}
+            {addon?.suggested_url && <span className="badge-neutral font-mono">{addon.suggested_url}</span>}
+          </div>
+          <p className="text-xs text-ink-500">
+            Die Einrichtung lädt ein kostenloses, lokales Modell über das Ollama-Add-on. Es entstehen keine Kosten
+            und es wird keine Abrechnung aktiviert.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-primary" onClick={setupAddon} disabled={addonBusy || !addon?.supervisor}>
+              {addonBusy ? "Einrichten …" : addonInstalled ? "Add-on prüfen & Adresse übernehmen" : "Ollama installieren & starten"}
+            </button>
+            <button type="button" className="btn-ghost" onClick={loadAddon} disabled={addonBusy}>
+              Status aktualisieren
+            </button>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[220px] flex-1">
+              <Text
+                id="pull_model"
+                label="Modell herunterladen"
+                value={pullModel}
+                onChange={setPullModel}
+                hint="Beispiel: llama3.2:3b, phi4-mini:3.8b oder qwen2.5:3b."
+              />
+            </div>
+            <button type="button" className="btn-secondary" onClick={doPull} disabled={pullBusy || !pullModel.trim()}>
+              {pullBusy ? "Lädt …" : "Herunterladen"}
+            </button>
+          </div>
+          {addonMessage && <Alert tone={addonMessage.tone}>{addonMessage.text}</Alert>}
+        </div>
+      </Card>
+
       <Card>
         <SectionTitle
           title="Lokales Modell (Ollama)"
@@ -717,6 +914,20 @@ function ImportSettings({ values, set, save, busy }: TabProps) {
           max={1}
           hint="Ähnlichkeit ab der Inhalte als Duplikat gelten (0,5 bis 1,0)."
         />
+        <Toggle
+          id="refine_after_import"
+          label="Nach dem Import automatisch nachbearbeiten"
+          checked={Boolean(values.refine_after_import)}
+          onChange={(value) => set("refine_after_import", value)}
+          hint="Startet die KI-Nachbearbeitung, sobald eine KI erreichbar ist."
+        />
+        <Toggle
+          id="refine_use_cloud"
+          label="Nachbearbeitung darf Gemini nutzen"
+          checked={Boolean(values.refine_use_cloud)}
+          onChange={(value) => set("refine_use_cloud", value)}
+          hint="Standard aus: Nachbearbeitung läuft dann nur lokal über Ollama."
+        />
       </div>
       <button
         type="button"
@@ -730,6 +941,8 @@ function ImportSettings({ values, set, save, busy }: TabProps) {
             "import_max_parallel",
             "import_memory_guard_mb",
             "dedupe_threshold",
+            "refine_after_import",
+            "refine_use_cloud",
           ])
         }
         disabled={busy}

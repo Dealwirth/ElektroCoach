@@ -186,8 +186,11 @@ def publish_discovery() -> bool:
     ok = True
     for sensor in SENSOR_DEFS:
         topic = f"{cfg['prefix']}/sensor/{DEVICE_ID}/{sensor['key']}/config"
+        # Ohne Geraetenamen im Feld "name": Home Assistant stellt den Geraetenamen
+        # sonst doppelt voran (sensor.elektrocoach_elektrocoach_...).
         payload: dict[str, Any] = {
-            "name": f"ElektroCoach {sensor['name']}",
+            "name": sensor["name"],
+            "object_id": f"{DEVICE_ID}_{sensor['key']}",
             "unique_id": f"{DEVICE_ID}_{sensor['key']}",
             "state_topic": f"{DEVICE_ID}/sensor/{sensor['key']}/state",
             "icon": sensor["icon"],

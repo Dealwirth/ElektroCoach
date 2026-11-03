@@ -10,6 +10,7 @@ import threading
 import time
 import uuid
 from collections.abc import Iterator, Sequence
+from pathlib import Path
 from typing import Any
 
 from .config import settings
@@ -21,6 +22,10 @@ SCHEMA_VERSION = 2
 _local = threading.local()
 _write_lock = threading.RLock()
 _initialised = False
+# Wird bei jeder Wiederherstellung erhoeht. Jeder Thread verwirft dann seine
+# Verbindung, weil sie auf die ersetzte Datei zeigt.
+_generation = 0
+_generation_lock = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -36,14 +41,51 @@ def _configure(conn: sqlite3.Connection) -> None:
     conn.execute("PRAGMA cache_size=-16000")
 
 
+def invalidate_connections() -> None:
+    """Alle Threads zwingen, ihre Verbindung neu aufzubauen.
+
+    Nötig nach dem Ersetzen der Datenbankdatei (Wiederherstellung). Eine alte
+    Verbindung zeigt dann auf eine geloeschte Datei und jeder Zugriff scheitert
+    mit "disk I/O error". Die eigenen Verbindungen werden sofort geschlossen;
+    andere Threads bauen ihre Verbindung beim naechsten Zugriff neu auf.
+    """
+    global _generation
+    with _generation_lock:
+        _generation += 1
+    close_thread_connection()
+
+
+def replace_database_file(source: os.PathLike[str] | str) -> None:
+    """Ersetzt die Datenbankdatei durch eine Kopie aus dem Backup.
+
+    Laeuft unter der Schreibsperre, damit kein anderer Thread gleichzeitig
+    schreibt. Anschliessend werden alle Verbindungen ungueltig gemacht.
+    """
+    import shutil
+
+    with _write_lock:
+        shutil.copy2(source, settings.db_path)
+        for suffix in ("-wal", "-shm"):
+            Path(str(settings.db_path) + suffix).unlink(missing_ok=True)
+    invalidate_connections()
+
+
 def get_conn() -> sqlite3.Connection:
     conn = getattr(_local, "conn", None)
+    if conn is not None and getattr(_local, "generation", -1) != _generation:
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001
+            pass
+        conn = None
+        _local.conn = None
     if conn is None:
         path = settings.db_path
         path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(path), check_same_thread=False, timeout=30)
         _configure(conn)
         _local.conn = conn
+        _local.generation = _generation
     return conn
 
 
@@ -349,6 +391,21 @@ CREATE TABLE IF NOT EXISTS import_jobs (
     updated_at       TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS refine_jobs (
+    id               TEXT PRIMARY KEY,
+    document_id      TEXT,
+    scope            TEXT NOT NULL DEFAULT 'review',
+    status           TEXT NOT NULL DEFAULT 'queued',
+    total_pages      INTEGER NOT NULL DEFAULT 0,
+    processed_pages  INTEGER NOT NULL DEFAULT 0,
+    current_page     INTEGER NOT NULL DEFAULT 0,
+    message          TEXT NOT NULL DEFAULT '',
+    cancel_requested INTEGER NOT NULL DEFAULT 0,
+    created_at       TEXT NOT NULL,
+    updated_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_refine_jobs_created ON refine_jobs(created_at);
+
 CREATE TABLE IF NOT EXISTS ai_usage (
     id         TEXT PRIMARY KEY,
     provider   TEXT NOT NULL,
@@ -560,6 +617,19 @@ def vacuum() -> None:
 def checkpoint() -> None:
     with write() as conn:
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+
+
+def checkpoint_quiet() -> None:
+    """Checkpoint beim Beenden: Fehler duerfen das Herunterfahren nicht stoeren.
+
+    Nach einer Wiederherstellung zeigt die vorhandene Verbindung auf eine
+    ersetzte Datei. Ein Checkpoint schlaegt dann fehl ("disk I/O error"). Beim
+    Herunterfahren ist das unerheblich, deshalb wird der Fehler nur protokolliert.
+    """
+    try:
+        checkpoint()
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Abschluss-Checkpoint der Datenbank uebersprungen: %s", exc)
 
 
 def backup_to(target: os.PathLike[str] | str) -> str:

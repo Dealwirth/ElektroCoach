@@ -11,6 +11,7 @@ Design:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -334,6 +335,22 @@ def _process_job(job_id: str, paths: list[str]) -> None:
             log.info("Themenanalyse nach Import: %s Abschnitte zugeordnet", report.get("assigned_chunks"))
         except Exception:  # noqa: BLE001 - Analysefehler darf den Import nicht verwerfen
             log.exception("Themenanalyse nach dem Import fehlgeschlagen")
+
+    if processed and settings.get_bool("refine_after_import", False):
+        # Nur anstossen, wenn wirklich eine KI erreichbar ist. Sonst bleibt der
+        # Import abgeschlossen und die Nachbearbeitung kann spaeter manuell
+        # gestartet werden.
+        try:
+            from ..services import ai_router
+            from . import refine_worker
+
+            status = asyncio.run(ai_router.status())
+            if status.get("any_available"):
+                refine_job = refine_worker.create_job(None, "review")
+                refine_worker.enqueue(refine_job)
+                log.info("Nachbearbeitung nach Import gestartet: %s", refine_job)
+        except Exception:  # noqa: BLE001
+            log.exception("Nachbearbeitung nach dem Import konnte nicht gestartet werden")
 
     _cleanup(raw_files, job_id)
     _set_job(
