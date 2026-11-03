@@ -162,7 +162,7 @@ _TIMEOUT = httpx.Timeout(connect=10.0, read=180.0, write=60.0, pool=10.0)
 
 def _timeout() -> httpx.Timeout:
     """Zeitlimit aus den Einstellungen. Schuetzt vor blockierten Anfragen."""
-    total = max(5, settings.get_int("ai_timeout_seconds", 60))
+    total = max(5, settings.get_int("ai_timeout_seconds", 180))
     return httpx.Timeout(connect=min(10.0, total), read=float(total), write=60.0, pool=10.0)
 
 

@@ -36,6 +36,7 @@ options:
   ollama_enabled: false
   ocr_languages: "deu+eng"
   ai_mode: "auto"
+  ai_timeout_seconds: 180
   refine_after_import: false
   refine_use_cloud: false
   ha_notify_service: ""
@@ -57,6 +58,7 @@ schema:
   ollama_enabled: "bool"
   ocr_languages: "str"
   ai_mode: "list(auto|local_only|cloud_only|off)"
+  ai_timeout_seconds: "int(30,900)"
   refine_after_import: "bool"
   refine_use_cloud: "bool"
   ha_notify_service: "str?"
