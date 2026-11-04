@@ -87,6 +87,25 @@ Voraussetzungen und Grenzen:
 * Der erste Modell-Download ist mehrere hundert MB groß und dauert auf dem Pi
   einige Minuten. Der Fortschritt ist im Add-on-Log sichtbar.
 
+### Wenn "Ollama nicht installiert" erscheint, obwohl es läuft
+
+Die Erkennung liest die Add-on-Liste am Supervisor. Meldet die Oberfläche
+„nicht installiert", zuerst die Diagnose aufrufen:
+
+```
+GET /api/system/supervisor
+```
+
+Die Antwort zeigt in einem Aufruf, ob der Token gültig ist, welche Rechte das
+Add-on hat und was der Supervisor zu den einzelnen Routen antwortet. Häufige
+Ursachen:
+
+* `hassio_api` oder `hassio_role: manager` fehlen in `config.yaml`. Dann lehnt
+  der Supervisor `/addons` mit 403 ab. (Seit Version 1.0.7 sind beide gesetzt.)
+* Die Antwort des Supervisors wurde nicht ausgepackt. Der Supervisor liefert
+  `{"result": "ok", "data": {...}}`; wer die Schlüssel oben liest, sieht eine
+  leere Liste. (Seit Version 1.0.10 behoben.)
+
 ### Wenn Ollama "500 Internal Server Error" meldet
 
 Der Ollama-Server startet, antwortet aber auf jede Anfrage mit HTTP 500. Im
