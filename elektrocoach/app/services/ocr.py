@@ -2,10 +2,15 @@
 
 Pipeline je Datei:
   * PDF   -> eingebetteter Text (pypdf); leere/gescannte Seiten werden mit
-             pypdfium2 gerendert und per Tesseract OCR gelesen.
-  * Bild  -> Tesseract OCR (deu+eng+equ), optional Gemini-Vision fuer
-             Handschrift.
+             pypdfium2 gerendert und per OCR gelesen.
+  * Bild  -> Handschrift-OCR (TrOCR, lokal) mit Rueckfall auf Tesseract;
+             optional Gemini-Vision.
   * Text  -> direkt uebernommen.
+
+Reihenfolge der Texterkennung (Einstellung ``ocr_engine``):
+  * ``auto``    - TrOCR fuer Handschrift, Tesseract als Rueckfall/Ergaenzung.
+  * ``trocr``   - nur TrOCR (Tesseract nur, wenn TrOCR nicht verfuegbar ist).
+  * ``tesseract`` - nur Tesseract.
 
 Ergebnis pro Seite: Text, Konfidenz, Kennzeichnung "needs_review".
 """
@@ -21,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from ..config import settings
+from . import handwriting, handwriting_post
 
 log = logging.getLogger(__name__)
 
@@ -155,6 +161,95 @@ def _clean_text(text: str) -> str:
     return "\n".join(lines).strip()
 
 
+def _engine_mode() -> str:
+    mode = str(settings.get("ocr_engine", "auto")).lower()
+    return mode if mode in {"auto", "trocr", "tesseract"} else "auto"
+
+
+def _post_level() -> str:
+    level = str(settings.get("ocr_postprocess", "standard")).lower()
+    return level if level in {"off", "light", "standard", "formula"} else "standard"
+
+
+def _postprocess(text: str) -> str:
+    return handwriting_post.postprocess(text, _post_level())
+
+
+def recognize_image(image: "Image.Image", data: bytes | None = None) -> dict[str, Any]:
+    """Erkennt Text auf einem Seitenbild mit der besten verfuegbaren Engine.
+
+    Rueckgabe: ``{text, confidence, engine, error, trocr_lines}``. Handschrift
+    liest TrOCR; Tesseract bleibt Rueckfall und wird bei Bedarf kombiniert.
+    """
+    mode = _engine_mode()
+    trocr_ready = mode != "tesseract" and handwriting.available()
+
+    trocr: dict[str, Any] | None = None
+    if trocr_ready:
+        trocr = handwriting.transcribe_image(image)
+
+    # Reines TrOCR: Ergebnis uebernehmen, wenn brauchbarer Text entsteht.
+    if trocr and trocr.get("ok") and trocr.get("text", "").strip():
+        text = _postprocess(_clean_text(trocr["text"]))
+        return {
+            "text": text,
+            "confidence": trocr.get("confidence"),
+            "engine": "trocr",
+            "error": None,
+            "trocr_lines": trocr.get("lines"),
+        }
+
+    if mode == "trocr" and trocr and not trocr.get("ok"):
+        # Ausdruecklich nur TrOCR gewuenscht, aber nicht einsatzbereit.
+        return {
+            "text": "",
+            "confidence": None,
+            "engine": "trocr",
+            "error": trocr.get("error"),
+            "trocr_lines": 0,
+        }
+
+    # Tesseract (Rueckfall oder ausdruecklich gewaehlt).
+    payload = data
+    if payload is None:
+        buffer = io.BytesIO()
+        image.convert("RGB").save(buffer, format="PNG")
+        payload = buffer.getvalue()
+    tesseract = ocr_image_bytes(payload)
+    if tesseract.get("ok"):
+        return {
+            "text": _postprocess(_clean_text(tesseract.get("text", ""))),
+            "confidence": tesseract.get("confidence"),
+            "engine": "tesseract",
+            "error": None,
+            "trocr_lines": None,
+        }
+    return {
+        "text": "",
+        "confidence": None,
+        "engine": "tesseract",
+        "error": tesseract.get("error") or (trocr or {}).get("error"),
+        "trocr_lines": None,
+    }
+
+
+def recognize_bytes(data: bytes) -> dict[str, Any]:
+    """Wie :func:`recognize_image`, aber aus rohen Bilddaten."""
+    if not _HAVE_TESSERACT:
+        # Ohne Pillow/Tesseract bleibt nur TrOCR (oeffnet selbst).
+        result = handwriting.transcribe_bytes(data)
+        result.setdefault("engine", "trocr")
+        result.setdefault("trocr_lines", result.get("lines"))
+        return result
+    try:
+        image = Image.open(io.BytesIO(data))
+        image.load()
+    except Exception as exc:  # noqa: BLE001
+        return {"text": "", "confidence": None, "engine": "none",
+                "error": f"Bild nicht lesbar: {exc}", "trocr_lines": None}
+    return recognize_image(image, data)
+
+
 def image_to_base64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
@@ -235,11 +330,11 @@ def process_pdf(path: Path, max_pages: int = 400, render_for_ocr: bool = True) -
         result.meta["scanned"] = True
         for index, image in enumerate(images, start=1):
             page = PageResult(page_number=index, image_bytes=image)
-            ocr = ocr_image_bytes(image)
-            if ocr["ok"] and ocr["text"]:
+            ocr = recognize_bytes(image)
+            if ocr["text"]:
                 page.text = ocr["text"]
                 page.confidence = ocr["confidence"]
-                page.meta["ocr"] = "tesseract"
+                page.meta["ocr"] = ocr["engine"]
             else:
                 page.meta["ocr_error"] = ocr.get("error")
             if page.confidence is not None and page.confidence < REVIEW_CONFIDENCE:
@@ -267,13 +362,13 @@ def process_pdf(path: Path, max_pages: int = 400, render_for_ocr: bool = True) -
         for idx in need_ocr:
             if idx >= len(images):
                 continue
-            ocr = ocr_image_bytes(images[idx])
+            ocr = recognize_bytes(images[idx])
             page = result.pages[idx]
             page.image_bytes = images[idx]
-            if ocr["ok"] and ocr["text"]:
+            if ocr["text"]:
                 page.text = ocr["text"]
                 page.confidence = ocr["confidence"]
-                page.meta["ocr"] = "tesseract"
+                page.meta["ocr"] = ocr["engine"]
             else:
                 page.meta["ocr_error"] = ocr.get("error")
                 page.needs_review = True
@@ -295,11 +390,11 @@ def process_image(path: Path) -> DocumentResult:
     result = DocumentResult(kind="image")
     page = PageResult(page_number=1, image_bytes=data,
                       image_mime=f"image/{path.suffix.lstrip('.').lower()}")
-    ocr = ocr_image_bytes(data)
-    if ocr["ok"]:
+    ocr = recognize_bytes(data)
+    if ocr["text"]:
         page.text = ocr["text"]
         page.confidence = ocr["confidence"]
-        page.meta["ocr"] = "tesseract"
+        page.meta["ocr"] = ocr["engine"]
         if page.confidence is not None and page.confidence < REVIEW_CONFIDENCE:
             page.needs_review = True
     else:

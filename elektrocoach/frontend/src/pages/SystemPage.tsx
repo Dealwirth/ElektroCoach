@@ -22,7 +22,7 @@ export default function SystemPage() {
   if (info.error) return <Alert tone="danger">{info.error}</Alert>;
   if (!info.data) return null;
 
-  const { storage, tesseract, ai, ha } = info.data;
+  const { storage, tesseract, handwriting, ai, ha } = info.data;
   const counts = storage.counts ?? {};
 
   return (
@@ -137,6 +137,14 @@ export default function SystemPage() {
                     : "nicht installiert"
                 }
               />
+              <Row
+                label="Handschrift"
+                value={
+                  handwriting.available
+                    ? `aktiv (TrOCR${handwriting.engine !== "auto" ? `, ${handwriting.engine}` : ""})`
+                    : "nicht verfügbar"
+                }
+              />
               <Row label="MQTT-Sensoren" value={ha.mqtt_enabled ? "aktiv" : "inaktiv"} />
               <Row label="Sensorintervall" value={`${ha.sensor_update_interval} s`} />
             </dl>
@@ -145,6 +153,14 @@ export default function SystemPage() {
                 <Alert tone="warning" title="Texterkennung nicht verfügbar">
                   Ohne Tesseract werden nur bereits digitale Texte aus PDF- und Textdateien gelesen.
                   Bilder und Scans benötigen die Texterkennung.
+                </Alert>
+              </div>
+            )}
+            {!handwriting.available && (
+              <div className="mt-3">
+                <Alert tone="warning" title="Handschrift-Modell nicht verfügbar">
+                  Ohne das lokale Handschrift-Modell liest nur Tesseract, der bei Handschrift
+                  unbrauchbare Ergebnisse liefert. Fehlende Dateien: {handwriting.missing.join(", ") || "unbekannt"}.
                 </Alert>
               </div>
             )}

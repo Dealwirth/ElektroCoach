@@ -46,6 +46,13 @@ DEFAULTS: dict[str, Any] = {
     "auto_analyze_after_import": True,
     # Import und Texterkennung
     "ocr_dpi": 150,
+    # Handschrift-OCR: "auto" (TrOCR, Tesseract als Rueckfall), "trocr" oder
+    # "tesseract". TrOCR liest deutsche Handschrift deutlich besser.
+    "ocr_engine": "auto",
+    # Nachbearbeitung: off | light | standard | formula
+    "ocr_postprocess": "standard",
+    # Maximale Zeilenlaenge (Token) je TrOCR-Durchlauf.
+    "ocr_trocr_max_tokens": 128,
     "use_ai_for_ocr": False,
     "gemini_allow_images": False,
     "allow_external_ai": True,

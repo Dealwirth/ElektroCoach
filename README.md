@@ -13,7 +13,7 @@ Plattform weiter — dann werden Aufgaben aus den eigenen Unterlagen erzeugt.
 
 | Bereich | Funktion |
 | --- | --- |
-| Import | PDF, Bilder, Scans, Samsung-Notes-Exporte (`.sdoc`, `.snote`, `.pdf`), Sammlungsimport, OCR (Tesseract, `deu+eng+equ`), Handschrift, Formeln, Tabellen, Schaltplanbilder |
+| Import | PDF, Bilder, Scans, Samsung-Notes-Exporte (`.sdoc`, `.snote`, `.pdf`), Sammlungsimport, OCR (Tesseract `deu+eng+equ` für Druckschrift, lokales TrOCR-Modell für Handschrift), Formeln, Tabellen, Schaltplanbilder |
 | Bibliothek | Dokumente, Seiten, Volltextsuche (SQLite FTS5), Seitenzuordnung, unsichere Erkennung gekennzeichnet, Dublettenerkennung |
 | Wissensbasis | Themen automatisch gruppieren, fehlende Prüfungsthemen erkennen und ergänzen, Quellenverknüpfung |
 | Lernen | Multiple-Choice, offene Fragen, Rechenaufgaben mit Rechenweg, Verständnisfragen, Praxisaufgaben; automatische Bewertung mit Teilpunkten und Erklärungen |
@@ -63,6 +63,7 @@ Kurzfassung:
 | --- | --- |
 | Installation und Einrichtung | [docs/INSTALLATION.md](docs/INSTALLATION.md) |
 | Aufzeichnungen importieren (Samsung Notes) | [docs/IMPORT_SAMSUNG_NOTES.md](docs/IMPORT_SAMSUNG_NOTES.md) |
+| Handschrifterkennung (TrOCR) | [docs/HANDSCHRIFT_OCR.md](docs/HANDSCHRIFT_OCR.md) |
 | Ollama und Gemini einrichten | [docs/KI_EINRICHTUNG.md](docs/KI_EINRICHTUNG.md) |
 | Backup und Wiederherstellung | [docs/BACKUP_WIEDERHERSTELLUNG.md](docs/BACKUP_WIEDERHERSTELLUNG.md) |
 | Testbericht | [docs/TESTBERICHT.md](docs/TESTBERICHT.md) |

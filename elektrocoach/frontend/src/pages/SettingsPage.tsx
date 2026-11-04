@@ -272,6 +272,36 @@ function Toggle({ id, label, checked, onChange, hint }: {
   );
 }
 
+function Select({ id, label, value, onChange, options, hint }: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  hint?: string;
+}) {
+  return (
+    <div>
+      <label className="label" htmlFor={id}>
+        {label}
+      </label>
+      <select
+        id={id}
+        className="input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
+    </div>
+  );
+}
+
 function KiSettings({ values, set, save, busy }: TabProps) {
   const [status, setStatus] = useState<import("../types").AiStatus | null>(null);
   const [models, setModels] = useState<Record<string, unknown> | null>(null);
@@ -867,11 +897,35 @@ function ImportSettings({ values, set, save, busy }: TabProps) {
         <NumberField
           id="ocr_dpi"
           label="Auflösung für OCR (DPI)"
-          value={Number(values.ocr_dpi ?? 300)}
+          value={Number(values.ocr_dpi ?? 150)}
           onChange={(value) => set("ocr_dpi", value)}
           min={150}
           max={600}
           hint="150 DPI ist der Standard. Höhere Werte erkennen Handschrift besser, brauchen aber mehr Speicher und Zeit."
+        />
+        <Select
+          id="ocr_engine"
+          label="Texterkennung (Engine)"
+          value={String(values.ocr_engine ?? "auto")}
+          onChange={(value) => set("ocr_engine", value)}
+          options={[
+            { value: "auto", label: "Automatisch (Handschrift bevorzugt)" },
+            { value: "trocr", label: "Handschrift-Modell (TrOCR, lokal)" },
+            { value: "tesseract", label: "Tesseract (nur Druckschrift)" },
+          ]}
+          hint="Automatisch nutzt das lokale Handschrift-Modell und fällt ohne Modell auf Tesseract zurück."
+        />
+        <Select
+          id="ocr_postprocess"
+          label="Nachbearbeitung der Erkennung"
+          value={String(values.ocr_postprocess ?? "standard")}
+          onChange={(value) => set("ocr_postprocess", value)}
+          options={[
+            { value: "off", label: "Aus" },
+            { value: "light", label: "Leicht (Einheiten, Akronyme)" },
+            { value: "standard", label: "Standard (plus Fachbegriffe, Formeln)" },
+          ]}
+          hint="Standard korrigiert Einheiten (30mA → 30 mA) und gleicht Fachbegriffe ab."
         />
         <Toggle
           id="use_ai_for_ocr"
@@ -936,6 +990,8 @@ function ImportSettings({ values, set, save, busy }: TabProps) {
           save([
             "ocr_languages",
             "ocr_dpi",
+            "ocr_engine",
+            "ocr_postprocess",
             "use_ai_for_ocr",
             "keep_page_images",
             "import_max_parallel",

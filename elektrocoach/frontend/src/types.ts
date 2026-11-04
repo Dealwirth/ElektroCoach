@@ -441,4 +441,12 @@ export interface SystemInfo {
   ai: AiStatus;
   ha: { mqtt_enabled: boolean; sensor_update_interval: number };
   tesseract: { available: boolean; languages: string[]; configured: string };
+  handwriting: {
+    available: boolean;
+    dir: string;
+    missing: string[];
+    dependencies: Record<string, boolean>;
+    engine: string;
+    postprocess: string;
+  };
 }
