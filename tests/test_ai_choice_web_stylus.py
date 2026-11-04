@@ -128,6 +128,13 @@ def test_strip_html_entfernt_auszeichnung():
     assert websearch._strip_html("<p>Hallo <b>Welt</b></p>").strip() == "Hallo Welt"
 
 
+def test_user_agent_has_contact_info() -> None:
+    """Wikimedia lehnt Anfragen ohne Kontaktadresse mit HTTP 403 ab."""
+    agent = websearch.USER_AGENT
+    assert "http" in agent, "Kontaktadresse im User-Agent fehlt"
+    assert "/" in agent.split("(")[0], "Versionskennung im User-Agent fehlt"
+
+
 # ---------------------------------------------------------------------------
 # Handschrift
 # ---------------------------------------------------------------------------

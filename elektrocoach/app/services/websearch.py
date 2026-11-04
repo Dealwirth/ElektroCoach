@@ -39,7 +39,12 @@ log = logging.getLogger(__name__)
 
 TIMEOUT = httpx.Timeout(connect=8.0, read=20.0, write=10.0, pool=5.0)
 MAX_PAGE_CHARS = 4000
-USER_AGENT = "ElektroCoach/1.0 (+Home Assistant Add-on; Lernplattform Elektrotechnik)"
+# Wikimedia verlangt einen aussagekraeftigen User-Agent mit Kontaktadresse
+# (https://w.wiki/4wJS). Ohne Kontakt antwortet der Dienst mit HTTP 403.
+USER_AGENT = (
+    "ElektroCoach/1.1 (Home-Assistant-Add-on, Lernplattform Elektrotechnik; "
+    "https://github.com/Dealwirth/ElektroCoach)"
+)
 
 # Fachlich und amtlich verlaessliche Adressen. Alles andere gilt als unsicher.
 AUTHORITATIVE = (
