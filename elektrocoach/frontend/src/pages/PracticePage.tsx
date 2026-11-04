@@ -2,8 +2,10 @@
  * Lernen: Themenkatalog, Fragengenerierung, Übungsrunde und Lernplan.
  */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { api, ApiError } from "../api";
+import { AiChooser, useAiChoice } from "../components/AiChooser";
+import { HandwritingCanvas, type HandwritingCanvasHandle } from "../components/HandwritingCanvas";
 import {
   Alert,
   Card,
@@ -110,8 +112,37 @@ function PracticeSession({
   const [result, setResult] = useState<GradeResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [stats, setStats] = useState({ answered: 0, correct: 0, points: 0, maxPoints: 0 });
+  const { provider, web, setProvider, setWeb } = useAiChoice();
+  const [drawMode, setDrawMode] = useState(false);
+  const [handwritingBusy, setHandwritingBusy] = useState(false);
+  const [handwritingError, setHandwritingError] = useState<string | null>(null);
+  const canvasRef = useRef<HandwritingCanvasHandle | null>(null);
 
   const current = queue[index];
+
+  const transcribe = async () => {
+    const handle = canvasRef.current;
+    if (!handle || handle.isEmpty()) {
+      setHandwritingError("Bitte zuerst schreiben.");
+      return;
+    }
+    setHandwritingBusy(true);
+    setHandwritingError(null);
+    try {
+      const browserText = await handle.browserText();
+      const result = await api.aiTranscribe(handle.toDataUrl(), current?.prompt ?? "", browserText);
+      if (result.ok && result.text) {
+        setAnswer(result.text);
+        setDrawMode(false);
+      } else {
+        setHandwritingError(result.error ?? "Handschrift konnte nicht erkannt werden.");
+      }
+    } catch (error) {
+      setHandwritingError(error instanceof ApiError ? error.message : String(error));
+    } finally {
+      setHandwritingBusy(false);
+    }
+  };
 
   const start = async (useAi: boolean) => {
     setBusy(true);
@@ -161,7 +192,11 @@ function PracticeSession({
     }
     setBusy(true);
     try {
-      const graded = await api.answerQuestion(current.id, { answer: value, use_ai: useAi });
+      const graded = await api.answerQuestion(current.id, {
+        answer: value,
+        use_ai: useAi,
+        provider: useAi ? provider : "local_only",
+      });
       setResult(graded);
       setStats((previous) => ({
         answered: previous.answered + 1,
@@ -293,31 +328,78 @@ function PracticeSession({
             })}
           </div>
         ) : (
-          <textarea
-            className="input min-h-[120px]"
-            placeholder={
-              current.qtype === "calculation"
-                ? "Rechenweg und Ergebnis angeben, z. B. U = 6,9 V"
-                : "Antwort formulieren …"
-            }
-            value={answer}
-            onChange={(event) => setAnswer(event.target.value)}
-            disabled={!!result}
-          />
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex rounded-lg bg-ink-100 p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setDrawMode(false)}
+                  className={`rounded-md px-3 py-1 text-xs font-medium ${
+                    !drawMode ? "bg-white text-brand-700 shadow-card" : "text-ink-600"
+                  }`}
+                >
+                  Tippen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDrawMode(true)}
+                  disabled={!!result}
+                  className={`rounded-md px-3 py-1 text-xs font-medium ${
+                    drawMode ? "bg-white text-brand-700 shadow-card" : "text-ink-600"
+                  }`}
+                >
+                  Mit Stift schreiben
+                </button>
+              </div>
+              <span className="text-[11px] text-ink-400">
+                Schreiben wird in Text umgewandelt und kann danach korrigiert werden.
+              </span>
+            </div>
+
+            {drawMode && !result ? (
+              <div className="space-y-3">
+                <HandwritingCanvas onReady={(handle) => (canvasRef.current = handle)} />
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={transcribe}
+                  disabled={handwritingBusy}
+                >
+                  {handwritingBusy ? "Wird erkannt …" : "Handschrift in Text umwandeln"}
+                </button>
+                {handwritingError && <Alert tone="warning">{handwritingError}</Alert>}
+              </div>
+            ) : (
+              <textarea
+                className="input min-h-[120px]"
+                placeholder={
+                  current.qtype === "calculation"
+                    ? "Rechenweg und Ergebnis angeben, z. B. U = 6,9 V"
+                    : "Antwort formulieren …"
+                }
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
+                disabled={!!result}
+              />
+            )}
+          </div>
         )}
       </div>
 
       {!result ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" className="btn-primary" onClick={() => submit(true)} disabled={busy}>
-            {busy ? "Wird bewertet …" : "Antwort prüfen"}
-          </button>
-          <button type="button" className="btn-secondary" onClick={() => submit(false)} disabled={busy}>
-            Nur lokal bewerten
-          </button>
-          <button type="button" className="btn-ghost" onClick={next}>
-            Überspringen
-          </button>
+        <div className="mt-4 space-y-3">
+          <AiChooser provider={provider} web={web} onProvider={setProvider} onWeb={setWeb} compact />
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn-primary" onClick={() => submit(true)} disabled={busy}>
+              {busy ? "Wird bewertet …" : "Antwort prüfen"}
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => submit(false)} disabled={busy}>
+              Nur lokal bewerten
+            </button>
+            <button type="button" className="btn-ghost" onClick={next}>
+              Überspringen
+            </button>
+          </div>
         </div>
       ) : (
         <div className="mt-5 space-y-4">

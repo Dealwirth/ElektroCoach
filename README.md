@@ -16,7 +16,8 @@ Plattform weiter — dann werden Aufgaben aus den eigenen Unterlagen erzeugt.
 | Import | PDF, Bilder, Scans, Samsung-Notes-Exporte (`.sdoc`, `.snote`, `.pdf`), Sammlungsimport, OCR (Tesseract, `deu+eng+equ`), Handschrift, Formeln, Tabellen, Schaltplanbilder |
 | Bibliothek | Dokumente, Seiten, Volltextsuche (SQLite FTS5), Seitenzuordnung, unsichere Erkennung gekennzeichnet, Dublettenerkennung |
 | Wissensbasis | Themen automatisch gruppieren, fehlende Prüfungsthemen erkennen und ergänzen, Quellenverknüpfung |
-| Lernen | Multiple-Choice, offene Fragen, Rechenaufgaben mit Rechenweg, Verständnisfragen, Praxisaufgaben; automatische Bewertung mit Teilpunkten und Erklärungen |
+| KI | Zwei Dienste: Ollama (lokal, kostenlos) und Gemini (Cloud, kostenloses Kontingent). **Pro Anfrage wählbar** (Auto/Ollama/Gemini). Lokales Modell darf auf Wunsch kontrolliert im Internet nachschlagen – nur verlässliche Quellen, immer mit Quellenangabe |
+| Lernen | Multiple-Choice, offene Fragen, Rechenaufgaben mit Rechenweg, Verständnisfragen, Praxisaufgaben; automatische Bewertung mit Teilpunkten und Erklärungen; **Antworten auch handschriftlich mit Stift** |
 | Lernplan | Spaced Repetition (SM-2), Stärken/Schwächen, individuelle Ziele, adaptive Schwierigkeit, fällige Wiederholungen |
 | Prüfung | Simulation mit Zeitlimit, drei Presets, Punkteverteilung, Auswertung, Vergleich mehrerer Durchläufe |
 | Schaltplan | Editor nach IEC-Konventionen: 20-px-Raster, 24 Symbole, Leitungen mit echten Anschlusspunkten, Undo/Redo, Kopieren, Rotation, SVG/JSON/PDF-Export |
@@ -68,6 +69,7 @@ Kurzfassung:
 | Testbericht | [docs/TESTBERICHT.md](docs/TESTBERICHT.md) |
 | Bekannte Einschränkungen | [docs/EINSCHRAENKUNGEN.md](docs/EINSCHRAENKUNGEN.md) |
 | SSD-Migration | [docs/SSD_MIGRATION.md](docs/SSD_MIGRATION.md) |
+| Änderungen je Version | [CHANGELOG.md](CHANGELOG.md) |
 
 ## Entwicklung
 

@@ -63,6 +63,13 @@ DEFAULTS: dict[str, Any] = {
     "ai_timeout_seconds": 180,
     "ai_max_retries": 1,
     "gemini_daily_limit": 450,
+    # Ist dies gesetzt, weicht die gewaehlte KI nicht auf die andere aus.
+    "ai_strict_provider": False,
+    # Webzugriff des lokalen Modells. Nur bei Bedarf und nur mit Quellen.
+    "web_enabled": True,
+    "web_allow_any": False,
+    "web_language": "de",
+    "web_max_results": 4,
     # Sicherheit
     "require_auth": False,
     "auth_password": "",

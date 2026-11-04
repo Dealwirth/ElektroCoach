@@ -541,8 +541,8 @@ function KiSettings({ values, set, save, busy }: TabProps) {
               onChange={(event) => set("ai_mode", event.target.value)}
             >
               <option value="auto">Automatisch (lokal bevorzugt)</option>
-              <option value="local">Nur lokal (Ollama)</option>
-              <option value="cloud">Nur Cloud (Gemini)</option>
+              <option value="local_only">Nur lokal (Ollama)</option>
+              <option value="cloud_only">Nur Cloud (Gemini)</option>
               <option value="off">Aus (keine KI)</option>
             </select>
           </div>
@@ -577,6 +577,67 @@ function KiSettings({ values, set, save, busy }: TabProps) {
           type="button"
           className="btn-primary mt-5"
           onClick={() => save(["ai_mode", "ai_timeout_seconds", "ai_max_retries", "gemini_daily_limit"])}
+          disabled={busy}
+        >
+          Speichern
+        </button>
+      </Card>
+
+      <Card className="lg:col-span-2">
+        <SectionTitle
+          title="Internet für das lokale Modell"
+          subtitle="Nur bei Bedarf, nur mit geprüften Quellen und immer mit Quellenangabe."
+        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Toggle
+            id="web_enabled"
+            label="Internetzugriff erlauben"
+            checked={Boolean(values.web_enabled ?? true)}
+            onChange={(value) => set("web_enabled", value)}
+            hint="Aus: das lokale Modell antwortet ausschließlich aus eigenem Wissen und deinen Aufzeichnungen."
+          />
+          <Toggle
+            id="web_allow_any"
+            label="Auch nicht amtliche Adressen zulassen"
+            checked={Boolean(values.web_allow_any)}
+            onChange={(value) => set("web_allow_any", value)}
+            hint="Empfohlen: aus. Dann werden nur verlässliche Adressen (Wikipedia, VDE, DIN, BDEW, BAFA …) verwendet."
+          />
+          <div>
+            <label className="label" htmlFor="web_language">
+              Suchsprache
+            </label>
+            <select
+              id="web_language"
+              className="input"
+              value={String(values.web_language ?? "de")}
+              onChange={(event) => set("web_language", event.target.value)}
+            >
+              <option value="de">Deutsch</option>
+              <option value="en">Englisch</option>
+            </select>
+          </div>
+          <NumberField
+            id="web_max_results"
+            label="Höchstzahl Quellen"
+            value={Number(values.web_max_results ?? 4)}
+            onChange={(value) => set("web_max_results", value)}
+            min={1}
+            max={8}
+            hint="Mehr Quellen kosten mehr Zeit. Für den Raspberry Pi sind 3–4 sinnvoll."
+          />
+        </div>
+        <div className="mt-4">
+          <Alert tone="info" title="So funktioniert der Webzugriff">
+            Im Tutor und beim Lernen kannst du „Web“ einschalten. Automatisch sucht die App nur bei
+            Fragen nach aktuellen Angaben (Normen, Förderungen, Preise). Jede übernommene Aussage wird
+            im Chat mit der Quelle verlinkt. Passt keine Quelle zur Frage, wird sie verworfen.
+          </Alert>
+        </div>
+        <button
+          type="button"
+          className="btn-primary mt-5"
+          onClick={() => save(["web_enabled", "web_allow_any", "web_language", "web_max_results"])}
           disabled={busy}
         >
           Speichern

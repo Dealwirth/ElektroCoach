@@ -307,6 +307,53 @@ export function Tabs<T extends string>({
   );
 }
 
+export function ProgressRing({
+  percent,
+  label,
+  size = 132,
+}: {
+  percent: number;
+  label?: string;
+  size?: number;
+}) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  const radius = (size - 16) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - clamped / 100);
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full -rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="9"
+          className="text-white/25"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#ffffff"
+          strokeWidth="9"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 700ms ease" }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+        <span className="text-3xl font-bold tracking-tight">{clamped}</span>
+        <span className="text-[11px] font-medium uppercase tracking-wide text-white/70">%</span>
+        {label && <span className="mt-0.5 text-[10px] uppercase tracking-wide text-white/60">{label}</span>}
+      </div>
+    </div>
+  );
+}
+
 export function BarChart({
   data,
   height = 140,

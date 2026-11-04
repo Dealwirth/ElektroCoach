@@ -9,7 +9,7 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 
 | Punkt | Wert |
 | --- | --- |
-| Tests | 280 automatisierte Tests, 5 übersprungen |
+| Tests | 310 automatisierte Tests, 5 übersprungen |
 | Laufzeit | Python 3.13.15, FastAPI 0.119.1, Uvicorn 0.39.0 |
 | Bildverarbeitung | Pillow 11.3.0, pypdfium2 4.30.0 |
 | OCR | Tesseract mit `deu`, `eng`, `equ` |
@@ -19,13 +19,13 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 ## 1. Automatisierte Tests
 
 ```
-280 passed, 5 skipped
+310 passed, 5 skipped
 ```
 
 | Testdatei | Anzahl | Inhalt |
 | --- | --- | --- |
 | `test_api.py` | 39 | HTTP-Endpunkte, Antwortformate, Fehlerfälle |
-| `test_schematic.py` | 29 | Symbole, Leitungen, Raster, Validierung, Export |
+| `test_schematic.py` | 30 | Symbole, Leitungen, Raster, Validierung, Export |
 | `test_learning.py` | 27 | Themen, Fragen, Bewertung, Lernplan |
 | `test_ha_and_resources.py` | 25 | Sensoren, Sensorwerte, Speichergrenzen |
 | `test_ai.py` | 23 | Weiterleitung, Kontingent, Ausfälle |
@@ -39,6 +39,20 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 | `test_refine_api.py` | 10 | Endpunkte der KI-Nachbearbeitung (neu) |
 | `test_refine.py` | 8 | Zweistufige Nachbearbeitung (neu) |
 | `test_spa_base.py` | 7 | Auslieferung der Oberfläche, `<base>` für Ingress (neu) |
+| `test_ai_choice_web_stylus.py` | 20 | KI pro Anfrage, strikte Wahl, Webquellen-Filter, Handschrift (neu) |
+
+### Neu in 1.1.0 geprüft
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Anbieterwahl `auto` / `ollama` / `gemini` je Anfrage | wirkt, Fallback-Kette bleibt erhalten |
+| `ai_strict_provider = true` | kein Ausweichen, klare Fehlermeldung |
+| Webquellen: nur verlässliche Adressen | fremde Adressen werden verworfen |
+| Webquellen: Passgenauigkeit | unpassende Treffer werden verworfen |
+| Webquellen: Quellenangabe | `[WEB-n]` und Link vorhanden |
+| Handschrift ohne Bildfreigabe | klare Meldung, kein stiller Fehlschlag |
+| Handschrift mit Gemini | Text kommt zurück, bleibt korrigierbar |
+| KI-Modus in den Einstellungen | schreibt `local_only` / `cloud_only`, wirkt jetzt |
 
 ## 2. Container-Build und -Start (echt durchgeführt)
 
@@ -333,3 +347,95 @@ mit Chromium über Playwright).
 | Backup anlegen und wiederherstellen | Beides erfolgreich, Sicherheitskopie angelegt |
 | Import direkt nach der Wiederherstellung | Erfolgreich (vorher „disk I/O error") |
 | `/api/health` nach allen Schritten | `status ok`, `db ok`, `worker_alive true` |
+
+## 14. Version 1.1.0: Prüfung im laufenden Container (echt durchgeführt)
+
+Geprüft an einem frisch gebauten Image (`elektrocoach:1.1.0`), gestartet mit
+eigenem Datenverzeichnis. Alle folgenden Schritte liefen gegen den echten
+HTTP-Dienst und die echte SQLite-Datenbank, nicht gegen Attrappen.
+
+### 14.1 Import, OCR und Volltextsuche
+
+| Schritt | Ergebnis |
+| --- | --- |
+| Bild-Import (PNG) über `/api/import` | Hintergrundjob `done`, 1 importiert, 0 Duplikate, 0 Fehler |
+| OCR (deutsches Tesseract) | Text korrekt erkannt (`Leitungsschutzschalter`, `Bemessungsstrom In = 16 A`) |
+| Mehrseitiges PDF importieren | 2 Seiten erkannt, Texte je Seite zugeordnet |
+| Sammlungszuordnung beim Import | Sammlung „Lehrjahr 1" korrekt gespeichert |
+| Volltextsuche (FTS5) | Treffer mit Dokument, Seite und Textausschnitt |
+| Doppelte Datei erneut importieren | Als `duplicate` erkannt, Bestand unverändert |
+| Importfortschritt über `/api/import/jobs/{id}` | Status, Zähler und Ergebnisliste vorhanden |
+
+### 14.2 Lernsystem, Bewertung und Prüfung
+
+| Schritt | Ergebnis |
+| --- | --- |
+| Themenkatalog | 28 Themen aus dem Katalog |
+| Fragen ohne KI erzeugen | 5 Fragen mit Quellenverweis auf die eigene Seite |
+| Antwort bewerten (offline) | Punkte, Teilpunkte, Feedback und Quellenzitat |
+| Fällige Wiederholungen | Liste und Anzahl korrekt |
+| Lernplan | Zeitbudget, Reihenfolge und Priorität berechnet |
+| Fortschritt und Serie | Kennzahlen und Tagesreihe vorhanden |
+| Prüfung anlegen, starten, antworten, abschließen | Voller Ablauf erfolgreich |
+| Prüfungsvergleich | Durchschnitt, Bestwert, Trend vorhanden |
+
+### 14.3 Schaltplan-Editor (Rechenkern)
+
+| Schritt | Ergebnis |
+| --- | --- |
+| Symbolbibliothek | 24 Symbole in 15 Kategorien |
+| Projekt anlegen, speichern, laden | Erfolgreich (Bauteile und Leitungen erhalten) |
+| Unbekannter Bauteiltyp | Als Fehler gemeldet |
+| Leitungen an echten Anschlüssen | Keine Fehler, keine freien Anschlüsse |
+| Kurzschluss L1–N | Erkannt und gemeldet |
+| Netzanalyse | Zusammenhängende Netze korrekt gruppiert |
+| SVG- und JSON-Export | Gültiges SVG, JSON mit allen Bauteilen |
+
+### 14.4 KI-Anbindung mit echtem HTTP-Durchstich
+
+Für einen echten Durchstich wurde nur die Basisadresse von Gemini auf einen
+lokalen Nachbau derselben Schnittstelle umgebogen. Alles andere (httpx,
+JSON-Aufbau, Antwortauswertung, `ai_router`, Endpunkte) war der echte Code.
+
+| Schritt | Ergebnis |
+| --- | --- |
+| Modellliste über die Schnittstelle | 2 Modelle erkannt |
+| Anfrage an Gemini | Antwort gelesen, Modell vermerkt |
+| Auswahl über `ai_router` | Anbieter `gemini`, kein Ausweichen |
+| Handschrift über Gemini | Text zurückgegeben, Methode `gemini` |
+| Kontingentzähler | Aufrufe je Anbieter gezählt |
+| Endpunkt `/api/ai/chat` | HTTP 200, Anbieter `gemini` |
+| Endpunkt `/api/ai/handwriting` | HTTP 200, Text, Konfidenz, Methode |
+
+### 14.5 Home-Assistant-Anbindung und Neustart
+
+| Schritt | Ergebnis |
+| --- | --- |
+| MQTT-Discovery | 10 Nachrichten, alle gültiges JSON, alle retained |
+| Sensorzustände | Fortschritt, Lernzeit, Wiederholungen, Fragen, Trefferquote, Serie |
+| Verfügbarkeitsthema | `online` (Klartext, wie von MQTT erwartet) |
+| Aktualisierungsintervall | 300 s, Scheduler läuft |
+| Container-Neustart | `/api/health` wieder `ok`, Datenbank ok, Worker aktiv |
+| Daten nach Neustart | Dokumente, Seiten, Fragen, Prüfungen und Schaltpläne erhalten |
+| Volltextsuche nach Neustart | Treffer weiterhin vorhanden |
+
+### 14.6 Backup und Wiederherstellung (echt durchgeführt)
+
+| Schritt | Ergebnis |
+| --- | --- |
+| Backup anlegen | Erfolgreich (`manuell`, Sicherungskopie geschrieben) |
+| Dokument löschen | Erfolgreich, Bestand 0 |
+| Wiederherstellung | Erfolgreich, Sicherheitskopie `vor-wiederherstellung-*.db` |
+| Bestand nach Wiederherstellung | Dokument wieder vorhanden |
+
+### 14.7 Dabei gefundener und behobener Fehler
+
+1. **Leitungslänge wurde als 0 m gemeldet.** Im Schaltplan-Editor zeigte die
+   Projektübersicht „0 m Leitungslänge", obwohl Leitungen vorhanden waren. Die
+   Berechnung summierte nur die gespeicherten Zwischenpunkte. Eine gerade
+   Leitung ohne Knick — der Normalfall — hat keine Zwischenpunkte und ergab
+   deshalb die Länge 0. Behoben: Die Länge wird jetzt vom Startanschluss über
+   die Zwischenpunkte zum Zielanschluss gemessen, aus derselben Pin-Geometrie
+   wie beim Zeichnen und beim SVG-Export. Geprüft mit dem Regressionstest
+   `test_leitung_ohne_zwischenpunkte_hat_trotzdem_laenge` (schlägt ohne die
+   Behebung fehl) und im Container (160 px für eine 160-px-Strecke).

@@ -492,6 +492,7 @@ def delete_question(question_id: str) -> bool:
 async def grade_answer(
     question_id: str, user_answer: str, duration_ms: int = 0,
     session_id: str | None = None, exam_id: str | None = None, use_ai: bool = True,
+    provider: str | None = None,
 ) -> dict[str, Any]:
     question = get_question(question_id)
     if not question:
@@ -516,7 +517,7 @@ async def grade_answer(
         numeric = offline.grade_numeric(user_answer, question["answer"])
         if numeric.get("needs_review"):
             grade, feedback, needs_review, ai_used = await _grade_text(
-                question, user_answer, max_points, use_ai
+                question, user_answer, max_points, use_ai, provider
             )
             score, correct = grade, grade >= max_points * 0.5
         else:
@@ -539,7 +540,7 @@ async def grade_answer(
             feedback = f"Erwartete Loesung: {question['answer']}"
     else:
         grade, feedback, needs_review, ai_used = await _grade_text(
-            question, user_answer, max_points, use_ai
+            question, user_answer, max_points, use_ai, provider
         )
         score, correct = grade, grade >= max_points * 0.5
 
@@ -576,6 +577,7 @@ async def grade_answer(
 
 async def _grade_text(
     question: dict[str, Any], user_answer: str, max_points: float, use_ai: bool,
+    provider: str | None = None,
 ) -> tuple[float, str, bool, bool]:
     """Bewertet offene oder Rechenaufgaben. KI wenn moeglich, sonst Schluesselwoerter."""
     if use_ai and user_answer.strip():
@@ -593,7 +595,7 @@ async def _grade_text(
         )
         result = await ai_router.complete(
             prompt, system=SYSTEM_TUTOR, task="grading", json_mode=True,
-            temperature=0.1, max_output_tokens=1200,
+            temperature=0.1, max_output_tokens=1200, provider=provider,
         )
         if result.get("ok"):
             parsed = ai_router.parse_json(result.get("text", ""))
