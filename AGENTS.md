@@ -101,6 +101,17 @@ Kontingent). Ziel: Raspberry Pi 4, 8 GB, Home Assistant OS, aarch64.
 13. **`OLLAMA_FLASH_ATTENTION=1` bei quantisiertem KV-Cache.** Ist
     `OLLAMA_KV_CACHE_TYPE=q8_0` gesetzt und Flash-Attention aus, antwortet das
     Ollama-Add-on auf jede Anfrage mit HTTP 500.
+14. **Handschrift nur mit TrOCR, nicht mit Tesseract.** Tesseract erreicht auf
+    deutscher Handschrift rund 52 % Zeichenfehler, das mitgelieferte
+    TrOCR-Modell (`models/trocr-de`, int8-ONNX) 0,5 %. Drei Fallstricke:
+    * Das Bild **seitenverhältnis-treu** auf 384 × 384 stauchen. Mit weißem
+      Rand auffüllen kostet 76 % statt 0,4 % CER.
+    * Kein KV-Cache im Decoder. Er bringt 2,3× Tempo, liefert aber andere
+      Tokens – Korrektheit geht vor.
+    * `py3-numpy` und `py3-onnxruntime` kommen als Alpine-Pakete (keine
+      musllinux-Wheels auf PyPI); `tokenizers` per `--no-deps` (nur das
+      native musl-Wheel wird gebraucht).
+    Status unter `handwriting` in `GET /api/system/info`.
 
 ## Git
 
