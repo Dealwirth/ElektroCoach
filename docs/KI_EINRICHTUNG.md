@@ -193,6 +193,70 @@ Einheiten und verknüpft die Quellen neu.
 * Ist keine KI erreichbar, bleibt der Originaltext unverändert erhalten und die
   Seite weiterhin als „zu prüfen" markiert. Es gehen keine Inhalte verloren.
 
+## KI pro Anfrage wählen
+
+Der Modus oben gilt als Grundeinstellung. Zusätzlich lässt sich **für jede
+einzelne Anfrage** wählen, welcher Dienst antwortet. Der Umschalter sitzt im
+Tutor und in jeder Übungsaufgabe:
+
+```
+[ Auto ] [ Ollama ] [ Gemini ]            [ Web ]
+```
+
+| Knopf | Wirkung |
+| --- | --- |
+| Auto | Grundeinstellung: lokal zuerst, Cloud nur bei Bedarf |
+| Ollama | Nur das lokale Modell, auch wenn Gemini verfügbar wäre |
+| Gemini | Nur die Cloud, auch wenn Ollama verfügbar wäre |
+| Web | Erlaubt dem lokalen Modell, im Internet nachzuschlagen |
+
+Die Wahl wird im Browser gespeichert und gilt weiter, bis du sie änderst.
+
+**Strikt oder ausweichend:** Standardmäßig weicht ElektroCoach aus, wenn der
+gewählte Dienst nicht antwortet (z. B. Ollama aus, dann Gemini). Soll die Wahl
+stattdessen strikt gelten, in den Einstellungen unter **KI-Dienste** die
+Option *„Gewählten Dienst strikt verwenden"* aktivieren. Dann erscheint bei
+Ausfall eine klare Meldung statt einer stillen Ausweichung.
+
+## Internet für das lokale Modell
+
+Das lokale Modell kann im Internet nachschlagen, wenn es etwas nicht sicher
+weiß. Das ist **ausgeschaltet, bis du es einschaltest**, und auch dann nur
+unter Bedingungen:
+
+| Regel | Bedeutung |
+| --- | --- |
+| Nur bei Bedarf | Im Modus „Auto“ wird nur bei aktuellen Angaben gesucht: Normen (DIN/VDE), Förderungen, Preise, Vorschriften. Mit „Web“ am Umschalter wird immer gesucht. |
+| Nur verlässliche Adressen | Wikipedia, VDE, DIN, BDEW, BAFA, DGUV, Bundesregierung. Andere Adressen nur, wenn *„Auch nicht amtliche Adressen zulassen"* aktiv ist. |
+| Nur passende Daten | Jeder Treffer wird gegen deine Frage geprüft. Passt er nicht, wird er verworfen – das Modell sieht ihn dann nicht. |
+| Immer mit Quelle | Jede übernommene Aussage wird im Text mit `[WEB-1]` belegt. Unter der Antwort stehen die Quellen mit Link. |
+
+Einstellungen dazu: **KI-Dienste → Internet für das lokale Modell**.
+
+## Antworten mit dem Stift
+
+Offene und Rechenaufgaben lassen sich handschriftlich beantworten – mit Stift,
+Finger oder Maus. Der Umschalter über dem Antwortfeld heißt *„Mit Stift
+schreiben"*.
+
+Ablauf:
+
+1. Schreibe auf die Fläche.
+2. *„Handschrift in Text umwandeln"* drücken.
+3. Der erkannte Text erscheint im Antwortfeld. **Prüfe und korrigiere ihn**,
+   bevor du bewertest.
+
+Die Erkennung läuft in dieser Reihenfolge:
+
+| Stufe | Wann | Voraussetzung |
+| --- | --- | --- |
+| Browser | Immer zuerst | Browser mit Handwriting-API (z. B. Chrome) und Stifteingabe |
+| Gemini-Bildanalyse | Wenn der Browser nichts erkennt | Gemini-Schlüssel und *„Bilder an die Cloud senden"* aktiv |
+| Keine | Wenn beides fehlt | Die App sagt es klar; bitte tippen |
+
+Unsicher erkannte Stellen werden im Text nicht erfunden. Ist das Ergebnis
+unbrauchbar, bleibt das Feld leer und eine Meldung erscheint.
+
 ## Ausfallverhalten
 
 Die Plattform funktioniert in jedem Fall weiter:

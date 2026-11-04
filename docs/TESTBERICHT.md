@@ -9,7 +9,7 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 
 | Punkt | Wert |
 | --- | --- |
-| Tests | 280 automatisierte Tests, 5 übersprungen |
+| Tests | 306 automatisierte Tests, 5 übersprungen |
 | Laufzeit | Python 3.13.15, FastAPI 0.119.1, Uvicorn 0.39.0 |
 | Bildverarbeitung | Pillow 11.3.0, pypdfium2 4.30.0 |
 | OCR | Tesseract mit `deu`, `eng`, `equ` |
@@ -19,7 +19,7 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 ## 1. Automatisierte Tests
 
 ```
-280 passed, 5 skipped
+306 passed, 5 skipped
 ```
 
 | Testdatei | Anzahl | Inhalt |
@@ -39,6 +39,20 @@ den echten Home-Assistant-Ingress geprüft (Abschnitt 12).
 | `test_refine_api.py` | 10 | Endpunkte der KI-Nachbearbeitung (neu) |
 | `test_refine.py` | 8 | Zweistufige Nachbearbeitung (neu) |
 | `test_spa_base.py` | 7 | Auslieferung der Oberfläche, `<base>` für Ingress (neu) |
+| `test_ai_choice_web_stylus.py` | 20 | KI pro Anfrage, strikte Wahl, Webquellen-Filter, Handschrift (neu) |
+
+### Neu in 1.1.0 geprüft
+
+| Prüfung | Ergebnis |
+| --- | --- |
+| Anbieterwahl `auto` / `ollama` / `gemini` je Anfrage | wirkt, Fallback-Kette bleibt erhalten |
+| `ai_strict_provider = true` | kein Ausweichen, klare Fehlermeldung |
+| Webquellen: nur verlässliche Adressen | fremde Adressen werden verworfen |
+| Webquellen: Passgenauigkeit | unpassende Treffer werden verworfen |
+| Webquellen: Quellenangabe | `[WEB-n]` und Link vorhanden |
+| Handschrift ohne Bildfreigabe | klare Meldung, kein stiller Fehlschlag |
+| Handschrift mit Gemini | Text kommt zurück, bleibt korrigierbar |
+| KI-Modus in den Einstellungen | schreibt `local_only` / `cloud_only`, wirkt jetzt |
 
 ## 2. Container-Build und -Start (echt durchgeführt)
 
