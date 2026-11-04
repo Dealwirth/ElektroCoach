@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
+import { AiChooser, ProviderBadge, useAiChoice } from "../components/AiChooser";
 import {
   Alert,
   Card,
@@ -21,7 +22,9 @@ interface ChatEntry {
   provider?: string;
   external?: boolean;
   fallback?: boolean;
+  webUsed?: boolean;
   sources?: Array<Record<string, unknown>>;
+  webSources?: Array<{ title: string; url: string; kind?: string }>;
   hint?: string;
 }
 
@@ -33,7 +36,7 @@ export default function TutorPage() {
     <div className="space-y-6">
       <PageHeader
         title="KI-Tutor"
-        subtitle="Fragen zu deinen Aufzeichnungen. Lokale KI bevorzugt, Cloud nur bei Bedarf."
+        subtitle="Fragen zu deinen Aufzeichnungen. Du entscheidest, welche KI antwortet."
       />
 
       {status.data && !status.data.any_available && (
@@ -107,6 +110,7 @@ function ChatPanel() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [useLibrary, setUseLibrary] = useState(true);
+  const { provider, web, setProvider, setWeb } = useAiChoice();
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -120,7 +124,7 @@ function ChatPanel() {
     setInput("");
     setBusy(true);
     try {
-      const result = await api.chat(message, useLibrary);
+      const result = await api.chat(message, useLibrary, provider, web);
       setEntries((current) => [
         ...current,
         result.ok
@@ -130,7 +134,9 @@ function ChatPanel() {
               provider: result.provider,
               external: result.external,
               fallback: result.fallback_used,
+              webUsed: result.web_used,
               sources: result.sources,
+              webSources: result.web_sources,
             }
           : {
               role: "system",
@@ -150,8 +156,9 @@ function ChatPanel() {
 
   return (
     <Card>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 space-y-3">
         <SectionTitle title="Fragen zu deinen Unterlagen" />
+        <AiChooser provider={provider} web={web} onProvider={setProvider} onWeb={setWeb} />
         <label className="flex items-center gap-2 text-xs text-ink-600">
           <input
             type="checkbox"
@@ -159,7 +166,7 @@ function ChatPanel() {
             onChange={(event) => setUseLibrary(event.target.checked)}
             className="h-4 w-4 rounded border-ink-300"
           />
-          Wissensbasis einbeziehen
+          Meine Aufzeichnungen einbeziehen
         </label>
       </div>
 
@@ -184,12 +191,12 @@ function ChatPanel() {
             <p className="whitespace-pre-wrap leading-relaxed">{entry.text}</p>
             {entry.role === "assistant" && (
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                {entry.provider && (
-                  <span className={entry.external ? "badge-warning" : "badge-success"}>
-                    {entry.external ? `Cloud: ${entry.provider}` : `lokal: ${entry.provider}`}
-                  </span>
-                )}
-                {entry.fallback && <span className="badge-neutral">Ausweichmodell</span>}
+                <ProviderBadge
+                  provider={entry.provider}
+                  external={entry.external}
+                  fallback={entry.fallback}
+                  webUsed={entry.webUsed}
+                />
               </div>
             )}
             {entry.sources && entry.sources.length > 0 && (
@@ -199,6 +206,26 @@ function ChatPanel() {
                   {entry.sources.map((source, sourceIndex) => (
                     <li key={sourceIndex} className="rounded-lg bg-ink-50 p-2 text-ink-600">
                       Seite {String(source.page_number ?? "–")} · {String(source.filename ?? "")}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            {entry.webSources && entry.webSources.length > 0 && (
+              <details className="mt-2 text-xs">
+                <summary className="cursor-pointer text-ink-500">Quellen aus dem Internet</summary>
+                <ul className="mt-1.5 space-y-1">
+                  {entry.webSources.map((source, sourceIndex) => (
+                    <li key={sourceIndex} className="rounded-lg bg-ink-50 p-2">
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-brand-700 underline"
+                      >
+                        {source.title}
+                      </a>
+                      <span className="ml-1 text-ink-400">({source.kind ?? "web"})</span>
                     </li>
                   ))}
                 </ul>

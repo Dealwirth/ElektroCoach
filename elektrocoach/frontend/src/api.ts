@@ -224,6 +224,36 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId ?? null, use_ai: useAi }),
     }),
+  handwritingStatus: () =>
+    request<{ available: boolean; images_allowed: boolean; gemini_configured: boolean }>(
+      "handwriting/status",
+    ),
+  transcribeHandwriting: (
+    examId: string,
+    questionId: string,
+    image: string,
+    browserText = "",
+    save = true,
+  ) =>
+    request<{
+      ok: boolean;
+      text?: string;
+      error?: string;
+      hint?: string;
+      method?: string;
+      confidence?: number | null;
+      unleserlich?: boolean;
+      hinweis?: string;
+      saved?: boolean;
+    }>(`exams/${examId}/handwriting`, {
+      method: "POST",
+      body: JSON.stringify({
+        question_id: questionId,
+        image,
+        browser_text: browserText,
+        save,
+      }),
+    }),
   compareExams: () => request<Record<string, unknown>>("exams/compare"),
   deleteExam: (id: string) => request<{ ok: boolean }>(`exams/${id}`, { method: "DELETE" }),
 
@@ -281,7 +311,7 @@ export const api = {
     }),
   ollamaInstalled: () =>
     request<{ ok: boolean; models: string[]; url?: string; error?: string }>("ai/ollama/installed"),
-  chat: (message: string, useLibrary = true) =>
+  chat: (message: string, useLibrary = true, provider = "auto", web = "auto") =>
     request<{
       ok: boolean;
       answer?: string;
@@ -289,14 +319,38 @@ export const api = {
       hint?: string;
       provider?: string;
       model?: string;
+      requested?: string;
       external?: boolean;
       fallback_used?: boolean;
+      web_used?: boolean;
       sources: Array<Record<string, unknown>>;
-    }>("ai/chat", { method: "POST", body: JSON.stringify({ message, use_library: useLibrary }) }),
+      web_sources?: Array<{ title: string; url: string; kind?: string }>;
+    }>("ai/chat", {
+      method: "POST",
+      body: JSON.stringify({ message, use_library: useLibrary, provider, web }),
+    }),
   explain: (question: string, topicId?: string, level = "pruefung") =>
     request<{ ok: boolean; answer?: string; error?: string; provider?: string }>("ai/explain", {
       method: "POST",
       body: JSON.stringify({ question, topic_id: topicId ?? null, level }),
+    }),
+  aiHandwritingStatus: () =>
+    request<{ available: boolean; images_allowed: boolean; gemini_configured: boolean }>(
+      "ai/handwriting/status",
+    ),
+  aiTranscribe: (image: string, hint = "", browserText = "") =>
+    request<{
+      ok: boolean;
+      text?: string;
+      error?: string;
+      hint?: string;
+      method?: string;
+      confidence?: number | null;
+      unleserlich?: boolean;
+      hinweis?: string;
+    }>("ai/handwriting", {
+      method: "POST",
+      body: JSON.stringify({ image, hint, browser_text: browserText }),
     }),
 
   // KI-Nachbearbeitung erkannter Texte

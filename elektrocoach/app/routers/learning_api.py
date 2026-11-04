@@ -81,6 +81,8 @@ class AnswerRequest(BaseModel):
     duration_ms: int = 0
     session_id: str | None = None
     use_ai: bool = True
+    # "auto" | "ollama" | "gemini" — gilt nur fuer diese Bewertung.
+    provider: str | None = None
 
 
 @router.post("/questions/{question_id}/answer")
@@ -89,6 +91,7 @@ async def answer_question(question_id: str, payload: AnswerRequest) -> dict[str,
         return await learning.grade_answer(
             question_id, payload.answer, duration_ms=payload.duration_ms,
             session_id=payload.session_id, use_ai=payload.use_ai,
+            provider=payload.provider,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

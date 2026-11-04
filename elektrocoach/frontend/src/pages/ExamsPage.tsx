@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, ApiError } from "../api";
+import { AnswerField } from "../components/AnswerField";
 import {
   Alert,
   Card,
@@ -369,6 +370,18 @@ function ExamRunner({
   const [result, setResult] = useState<ExamResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [showFinish, setShowFinish] = useState(false);
+  const [handwritingAvailable, setHandwritingAvailable] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .handwritingStatus()
+      .then((status) => active && setHandwritingAvailable(status.available))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -601,13 +614,14 @@ function ExamRunner({
                   })}
                 </div>
               ) : (
-                <textarea
-                  className="input min-h-[100px]"
-                  placeholder="Antwort …"
+                <AnswerField
                   value={answers[question.question_id] ?? ""}
-                  onChange={(event) =>
-                    setAnswers((current) => ({ ...current, [question.question_id]: event.target.value }))
+                  onChange={(next) =>
+                    setAnswers((current) => ({ ...current, [question.question_id]: next }))
                   }
+                  examId={exam.id}
+                  questionId={question.question_id}
+                  handwritingAvailable={handwritingAvailable}
                 />
               )}
             </div>

@@ -9,6 +9,7 @@ import {
   EmptyState,
   PageHeader,
   ProgressBar,
+  ProgressRing,
   SectionTitle,
   Spinner,
   StatCard,
@@ -34,9 +35,12 @@ export default function DashboardPage() {
   if (!data) return null;
 
   const { stats, series, weak_areas: weakAreas, plan, ai, activity } = data;
-  const progressPercent = stats.topics
-    ? Math.min(100, (stats.topics > 0 ? stats.attempts / (stats.topics * 20) : 0) * 100)
+  const mastery = stats.attempts
+    ? Math.max(0, Math.min(1, (stats.accuracy * 0.6) + (stats.streak_days / 30) * 0.2 + Math.min(1, stats.attempts / 200) * 0.2))
     : 0;
+  const readiness = Math.round(mastery * 100);
+  const readinessText =
+    readiness >= 75 ? "Gut vorbereitet" : readiness >= 50 ? "Auf Kurs" : "Am Anfang";
 
   return (
     <div className="space-y-6">
@@ -49,6 +53,36 @@ export default function DashboardPage() {
           </Link>
         }
       />
+
+      <section className="hero-band">
+        <div className="flex flex-wrap items-center justify-between gap-6">
+          <div className="min-w-[240px] flex-1">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
+              Prüfungsvorbereitung
+            </p>
+            <h2 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
+              {readinessText}
+            </h2>
+            <p className="mt-2 max-w-lg text-sm leading-relaxed text-white/85">
+              {stats.due_reviews > 0
+                ? `${stats.due_reviews} Wiederholungen warten heute auf dich.`
+                : "Keine Wiederholungen offen. Nutze die Zeit für neue Themen."}{" "}
+              {stats.today_minutes >= stats.daily_goal_minutes
+                ? "Tagesziel erreicht."
+                : `Noch ${Math.max(0, stats.daily_goal_minutes - stats.today_minutes)} Minuten bis zum Tagesziel.`}
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link to="/pruefungen" className="btn bg-white/15 text-white hover:bg-white/25">
+                Prüfung simulieren
+              </Link>
+              <Link to="/tutor" className="btn bg-white/15 text-white hover:bg-white/25">
+                KI-Tutor fragen
+              </Link>
+            </div>
+          </div>
+          <ProgressRing percent={readiness} label="Lernstand" />
+        </div>
+      </section>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard
@@ -288,7 +322,7 @@ export default function DashboardPage() {
           )}
           <div className="mt-4">
             <ProgressBar
-              value={progressPercent}
+              value={readiness}
               label="Gesamtfortschritt (Orientierung)"
               tone="brand"
             />

@@ -56,14 +56,26 @@ async def complete(
     json_mode: bool = False,
     temperature: float = 0.2,
     max_output_tokens: int = 2048,
+    provider: str | None = None,
 ) -> dict[str, Any]:
     """Fuehrt eine KI-Anfrage mit Ausweichkette aus.
 
-    Rueckgabe: {ok, text, provider, model, error, fallback_used}
+    ``provider`` waehlt die KI fuer genau diese Anfrage:
+      * ``None`` oder ``"auto"``  -> automatische Wahl (siehe oben),
+      * ``"ollama"``              -> bevorzugt lokal, Ausweichen erlaubt,
+      * ``"gemini"``              -> bevorzugt Cloud, Ausweichen erlaubt,
+      * ``"local_only"`` / ``"cloud_only"`` -> nur diese Quelle, kein Ausweichen.
+
+    Rueckgabe: {ok, text, provider, model, error, fallback_used, requested}
     """
     current_mode = mode()
     if current_mode == "off":
         return {"ok": False, "error": "KI ist in den Einstellungen deaktiviert", "provider": "none"}
+
+    requested = _normalise_provider(provider)
+    strict = requested in {"local_only", "cloud_only"} or settings.get_bool(
+        "ai_strict_provider", False
+    )
 
     # Datenschutz: externe Dienste nur, wenn ausdruecklich erlaubt.
     external_allowed = settings.get_bool("allow_external_ai", True) and not settings.get_bool(
@@ -79,23 +91,17 @@ async def complete(
     prompt_len = len(prompt or "")
     prefer_local = _prefer_local(task, has_images, prompt_len)
 
-    order: list[str]
-    if current_mode == "local_only":
-        order = ["ollama"]
-    elif current_mode == "cloud_only":
-        order = ["gemini"] if external_allowed else []
-    else:
-        order = ["ollama", "gemini"] if prefer_local else ["gemini", "ollama"]
+    order = _provider_order(current_mode, requested, prefer_local, strict)
     if not external_allowed:
-        order = [provider for provider in order if provider != "gemini"]
+        order = [name for name in order if name != "gemini"]
     # Nachbearbeitung: Cloud nur, wenn ausdruecklich freigegeben. Sonst bleibt
     # der lokale Weg (Ollama) die einzige Quelle.
     if task.startswith("ocr_refine") and not settings.get_bool("refine_use_cloud", False):
-        order = [provider for provider in order if provider != "gemini"]
+        order = [name for name in order if name != "gemini"]
 
     errors: list[str] = []
-    for provider in order:
-        if provider == "ollama":
+    for name in order:
+        if name == "ollama":
             if not ollama.is_enabled():
                 errors.append("Ollama deaktiviert")
                 continue
@@ -115,11 +121,12 @@ async def complete(
         if result.get("ok"):
             result["fallback_used"] = bool(errors)
             result["attempt_errors"] = errors
-            result["external"] = provider == "gemini"
+            result["external"] = name == "gemini"
+            result["requested"] = requested
             return result
-        errors.append(f"{provider}: {result.get('error')}")
+        errors.append(f"{name}: {result.get('error')}")
         if result.get("quota_exhausted"):
-            log.info("Kontingent fuer %s erschoepft, weiche aus.", provider)
+            log.info("Kontingent fuer %s erschoepft, weiche aus.", name)
 
     if not order:
         errors.append("Externe KI ist deaktiviert")
@@ -129,9 +136,42 @@ async def complete(
         "error": "; ".join(errors) or "Keine KI erreichbar",
         "fallback_used": True,
         "external": False,
+        "requested": requested,
     }
 
 
+def _normalise_provider(provider: str | None) -> str:
+    """Bringt die Angabe der Oberflaeche auf einen bekannten Wert."""
+    value = (provider or "auto").strip().lower()
+    return {
+        "ollama": "ollama",
+        "local": "ollama",
+        "local_only": "local_only",
+        "gemini": "gemini",
+        "cloud": "gemini",
+        "cloud_only": "cloud_only",
+        "auto": "auto",
+        "": "auto",
+    }.get(value, "auto")
+
+
+def _provider_order(
+    current_mode: str, requested: str, prefer_local: bool, strict: bool
+) -> list[str]:
+    """Reihenfolge der Dienste fuer diese Anfrage."""
+    if current_mode == "local_only":
+        return ["ollama"]
+    if current_mode == "cloud_only":
+        return ["gemini"]
+    if requested == "local_only":
+        return ["ollama"]
+    if requested == "cloud_only":
+        return ["gemini"]
+    if requested == "ollama":
+        return ["ollama"] if strict else ["ollama", "gemini"]
+    if requested == "gemini":
+        return ["gemini"] if strict else ["gemini", "ollama"]
+    return ["ollama", "gemini"] if prefer_local else ["gemini", "ollama"]
 def _ollama_images(images: list[dict[str, str]] | None) -> list[str] | None:
     """Ollama erwartet reine Base64-Strings ohne Datenpraefix."""
     if not images:

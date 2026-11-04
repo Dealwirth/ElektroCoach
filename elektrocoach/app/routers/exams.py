@@ -8,7 +8,10 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from ..config import settings
+from ..services import gemini
 from ..services import exam as exam_service
+from ..services import handwriting as handwriting_service
 
 log = logging.getLogger(__name__)
 
@@ -76,6 +79,53 @@ async def save_answer(exam_id: str, payload: ExamAnswer) -> dict[str, Any]:
     if not exam_service.save_answer(exam_id, payload.question_id, payload.answer):
         raise HTTPException(status_code=404, detail="Frage gehoert nicht zu dieser Pruefung")
     return {"ok": True}
+
+
+class HandwritingRequest(BaseModel):
+    """Handschriftliche Antwort, die in Text umgewandelt werden soll."""
+
+    question_id: str
+    image: str = Field(min_length=32, description="Data-URL des Handschriftbildes")
+    browser_text: str = ""
+    save: bool = True
+
+
+@router.post("/exams/{exam_id}/handwriting")
+async def handwriting(exam_id: str, payload: HandwritingRequest) -> dict[str, Any]:
+    """Erkennt eine handschriftliche Antwort und speichert sie als Text.
+
+    Das Bild wird nur verarbeitet, wenn die Bildfreigabe aktiv ist. Der
+    erkannte Text wird, wenn gewuenscht, direkt als Antwort gespeichert.
+    """
+    exam = exam_service.get_exam(exam_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Pruefung nicht gefunden")
+
+    question = next(
+        (q for q in exam.get("questions", []) if q["question_id"] == payload.question_id),
+        None,
+    )
+    if question is None:
+        raise HTTPException(status_code=404, detail="Frage gehoert nicht zu dieser Pruefung")
+
+    result = await handwriting_service.transcribe(
+        payload.image,
+        hint=str(question.get("prompt") or ""),
+        browser_text=payload.browser_text,
+    )
+    if result.get("ok") and payload.save and result.get("text"):
+        exam_service.save_answer(exam_id, payload.question_id, result["text"])
+    result["saved"] = bool(result.get("ok") and payload.save)
+    return result
+
+
+@router.get("/handwriting/status")
+async def handwriting_status() -> dict[str, Any]:
+    return {
+        "available": handwriting_service.available(),
+        "images_allowed": settings.get_bool("gemini_allow_images", False),
+        "gemini_configured": gemini.is_configured(),
+    }
 
 
 class FinishRequest(BaseModel):

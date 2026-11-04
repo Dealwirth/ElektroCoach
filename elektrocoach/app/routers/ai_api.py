@@ -8,14 +8,17 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from ..config import settings
 from ..services import (
     ai_router,
     ai_usage,
     gemini,
     ha_integration,
+    handwriting,
     learning,
     ollama,
     ollama_addon,
+    websearch,
 )
 from ..workers import refine_worker
 
@@ -53,11 +56,40 @@ async def gemini_models() -> dict[str, Any]:
     return await gemini.list_models()
 
 
+class TranscribeRequest(BaseModel):
+    """Handschriftbild ohne Bezug zu einer Pruefung (z. B. Uebungsmodus)."""
+
+    image: str = Field(min_length=32, description="Data-URL des Handschriftbildes")
+    hint: str = ""
+    browser_text: str = ""
+
+
+@router.post("/ai/handwriting")
+async def ai_handwriting(payload: TranscribeRequest) -> dict[str, Any]:
+    """Wandelt ein Handschriftbild in Text um (Uebungsmodus)."""
+    return await handwriting.transcribe(
+        payload.image, hint=payload.hint, browser_text=payload.browser_text
+    )
+
+
+@router.get("/ai/handwriting/status")
+async def ai_handwriting_status() -> dict[str, Any]:
+    return {
+        "available": handwriting.available(),
+        "images_allowed": settings.get_bool("gemini_allow_images", False),
+        "gemini_configured": gemini.is_configured(),
+    }
+
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     topic_id: str | None = None
     use_library: bool = True
     history: list[dict[str, str]] = Field(default_factory=list)
+    # "auto" | "ollama" | "gemini" — gilt nur fuer diese Anfrage.
+    provider: str | None = None
+    # "auto" | "on" | "off" — Webzugriff des lokalen Modells.
+    web: str = "auto"
 
 
 @router.post("/ai/chat")
@@ -78,36 +110,64 @@ async def chat(payload: ChatRequest) -> dict[str, Any]:
     material = "\n\n".join(
         f"[{c['filename']} S.{c['page']}]\n{c['text']}" for c in context_blocks
     )
+
+    # Web nur, wenn sinnvoll und ausdruecklich gewuenscht. Vorher fragen, ob
+    # aktuelle Angaben gebraucht werden.
+    web_hits: list[dict[str, Any]] = []
+    if websearch.needs_web(payload.message, payload.web):
+        try:
+            web_hits = await websearch.search(
+                payload.message, limit=settings.get_int("web_max_results", 4)
+            )
+        except Exception as exc:  # noqa: BLE001
+            log.info("Websuche fehlgeschlagen: %s", exc)
+
     prompt = payload.message
+    sections: list[str] = []
     if material:
+        sections.append(f"MATERIAL AUS DEN EIGENEN AUFZEICHNUNGEN:\n{material}")
+    if web_hits:
+        sections.append(
+            "AKTUELLE INFORMATIONEN AUS DEM INTERNET (jede Aussage mit Quelle nennen):\n"
+            + websearch.build_context(web_hits)
+        )
+    if sections:
         prompt = (
-            "Beantworte die Frage fachlich korrekt. Nutze, wenn passend, das folgende "
-            "Material aus den eigenen Aufzeichnungen und nenne die Fundstellen.\n\n"
-            f"MATERIAL:\n{material}\n\nFRAGE:\n{payload.message}"
+            "Beantworte die Frage fachlich korrekt. Nutze die folgenden Angaben. "
+            "Nenne bei jeder Aussage die Quelle in eckigen Klammern "
+            "(z. B. [notiz.png S.1] oder [WEB-1]). Wenn eine Angabe unsicher ist, "
+            "sage das ausdruecklich. Erfinde nichts.\n\n"
+            + "\n\n".join(sections)
+            + f"\n\nFRAGE:\n{payload.message}"
         )
 
     result = await ai_router.complete(
         prompt, system=learning.SYSTEM_TUTOR, task="chat",
-        temperature=0.3, max_output_tokens=2048,
+        temperature=0.3, max_output_tokens=2048, provider=payload.provider,
     )
     if not result.get("ok"):
         return {
             "ok": False,
             "error": result.get("error"),
+            "requested": result.get("requested"),
             "hint": (
                 "Weder Ollama noch Gemini sind erreichbar. Die Wissenssuche und "
                 "alle Lernfunktionen ohne KI bleiben verfuegbar."
             ),
             "sources": context_blocks,
+            "web_sources": websearch.sources(web_hits),
         }
     return {
         "ok": True,
         "answer": result.get("text"),
         "provider": result.get("provider"),
         "model": result.get("model"),
+        "requested": result.get("requested"),
         "fallback_used": result.get("fallback_used", False),
         "external": result.get("provider") == "gemini",
         "sources": context_blocks,
+        "web_sources": websearch.sources(web_hits),
+        "web_used": bool(web_hits),
     }
 
 

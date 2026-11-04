@@ -1,5 +1,5 @@
 name: "ElektroCoach"
-version: "1.0.11"
+version: "1.1.0"
 slug: "elektrocoach"
 description: "KI-Lernplattform für Elektroniker Energie- und Gebäudetechnik mit OCR-Import, Lernsystem, Prüfungssimulation und Schaltplan-Editor"
 url: "https://github.com/Dealwirth/ElektroCoach/tree/main/elektrocoach"
@@ -40,6 +40,7 @@ options:
   ollama_enabled: false
   ocr_languages: "deu+eng"
   ai_mode: "auto"
+  ai_strict_provider: false
   ai_timeout_seconds: 180
   refine_after_import: false
   refine_use_cloud: false
@@ -53,6 +54,10 @@ options:
   daily_study_minutes: 45
   sensor_update_interval: 300
   log_level: "info"
+  web_enabled: true
+  web_allow_any: false
+  web_language: "de"
+  web_max_results: 4
 schema:
   gemini_api_key: "password?"
   gemini_text_model: "str"
@@ -62,6 +67,7 @@ schema:
   ollama_enabled: "bool"
   ocr_languages: "str"
   ai_mode: "list(auto|local_only|cloud_only|off)"
+  ai_strict_provider: "bool"
   ai_timeout_seconds: "int(30,900)"
   refine_after_import: "bool"
   refine_use_cloud: "bool"
@@ -75,3 +81,7 @@ schema:
   daily_study_minutes: "int(5,600)"
   sensor_update_interval: "int(30,3600)"
   log_level: "list(debug|info|warning|error)"
+  web_enabled: "bool"
+  web_allow_any: "bool"
+  web_language: "list(de|en)"
+  web_max_results: "int(1,8)"
