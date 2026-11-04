@@ -29,6 +29,9 @@ Kurze Übersicht der Versionen. Die Anwendung meldet ihre Version in
 ### Behoben
 - Der KI-Modus in den Einstellungen schrieb `local` / `cloud`, der Server
   erwartet `local_only` / `cloud_only`. Die Auswahl wirkte deshalb nicht.
+- Schaltplan-Editor: Eine gerade Leitung ohne Knick wurde in der Übersicht als
+  „0 m Leitungslänge" angezeigt. Die Länge wird jetzt vom Startanschluss über
+  die Zwischenpunkte zum Zielanschluss gemessen.
 
 ## 1.0.11
 - Dokumentation zu Supervisor-Fallstricken ergänzt.

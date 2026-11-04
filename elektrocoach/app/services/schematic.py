@@ -373,12 +373,37 @@ def connected_groups(data: dict[str, Any]) -> list[list[str]]:
     return sorted(groups.values(), key=len, reverse=True)
 
 
-def wire_length(points: list[dict[str, float]]) -> float:
+def polyline_length(points: list[dict[str, float]]) -> float:
     pts = normalise_points(points)
     total = 0.0
     for a, b in zip(pts, pts[1:]):
         total += math.hypot(float(b["x"]) - float(a["x"]), float(b["y"]) - float(a["y"]))
     return round(total, 2)
+
+
+def wire_length(wire: dict[str, Any], components_by_id: dict[str, dict[str, Any]]) -> float:
+    """Laenge einer Leitung vom Startanschluss ueber die Zwischenpunkte zum Ziel.
+
+    Die Zwischenpunkte allein reichen nicht: eine Leitung ohne Knick (der
+    Normalfall) haette sonst die Laenge 0. Start und Ziel werden deshalb aus
+    der aktuellen Pin-Geometrie berechnet - genau wie beim Zeichnen und beim
+    SVG-Export.
+    """
+    points: list[dict[str, float]] = []
+    start = wire.get("from") or {}
+    end = wire.get("to") or {}
+    start_component = components_by_id.get(str(start.get("component_id")))
+    end_component = components_by_id.get(str(end.get("component_id")))
+    if start_component is not None:
+        position = pin_position(start_component, str(start.get("pin_id")))
+        if position:
+            points.append(position)
+    points.extend(normalise_points(wire.get("points")))
+    if end_component is not None:
+        position = pin_position(end_component, str(end.get("pin_id")))
+        if position:
+            points.append(position)
+    return polyline_length(points)
 
 
 def design_stats(data: dict[str, Any]) -> dict[str, Any]:
@@ -388,8 +413,11 @@ def design_stats(data: dict[str, Any]) -> dict[str, Any]:
     for component in components:
         key = str(component.get("type", "unbekannt"))
         by_type[key] = by_type.get(key, 0) + 1
+    components_by_id = {
+        str(c.get("id")): c for c in components if isinstance(c, dict) and c.get("id")
+    }
     total_length = sum(
-        wire_length(w.get("points") or []) for w in wires
+        wire_length(w, components_by_id) for w in wires if isinstance(w, dict)
     )
     return {
         "components": len(components),

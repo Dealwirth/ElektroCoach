@@ -239,6 +239,29 @@ def test_design_statistik():
     assert stats["wire_length_px"] > 0
 
 
+def test_leitung_ohne_zwischenpunkte_hat_trotzdem_laenge():
+    """Regression: eine gerade Leitung ohne Knick wurde als 0 m gemeldet.
+
+    Die Laenge muss aus der Pin-Geometrie kommen, nicht nur aus den
+    gespeicherten Zwischenpunkten.
+    """
+    design = {
+        "components": [
+            {"id": "c1", "type": "supply_l1", "x": 0, "y": 0, "rotation": 0, "label": "L1"},
+            {"id": "c2", "type": "mcb", "x": 200, "y": 0, "rotation": 0, "label": "F1"},
+        ],
+        "wires": [
+            {"id": "w1", "from": {"component_id": "c1", "pin_id": "L1"},
+             "to": {"component_id": "c2", "pin_id": "1"}, "points": []},
+        ],
+        "junctions": [],
+    }
+    stats = schematic.design_stats(design)
+    assert stats["wire_length_px"] > 0
+    # L1-Pin liegt bei x=40, Klemme 1 des LS bei x=200 -> 160 px.
+    assert stats["wire_length_px"] == 160.0
+
+
 def test_projekt_anlegen_speichern_laden_loeschen():
     project = schematic.create_project("Testprojekt", "Beschreibung", _design())
     assert project["id"]
