@@ -122,15 +122,21 @@ async def transcribe(
         }
 
     if not available():
-        return {
-            "ok": False,
-            "error": "Handschrifterkennung ist nicht freigegeben.",
-            "method": "offline",
-            "hint": (
-                "Bitte in den Einstellungen die Bildfreigabe fuer Gemini einschalten "
-                "oder die Antwort tippen. Die Aufgabe bleibt sonst unbewertet."
-            ),
-        }
+        # Zwei verschiedene Ursachen, zwei verschiedene Hinweise. Sonst sucht
+        # der Nutzer an der falschen Stelle.
+        if not gemini.is_configured():
+            error = "Handschrifterkennung braucht einen Gemini-Schluessel."
+            hint = (
+                "Es ist kein Gemini-Schluessel hinterlegt. Entweder den Schluessel "
+                "unter Einstellungen -> KI-Dienste eintragen oder die Antwort tippen."
+            )
+        else:
+            error = "Bilder sind fuer die Cloud nicht freigegeben."
+            hint = (
+                "Unter Einstellungen -> KI-Dienste die Option 'Bilder an die Cloud "
+                "senden' einschalten oder die Antwort tippen."
+            )
+        return {"ok": False, "error": error, "method": "offline", "hint": hint}
 
     image = _decode_image(image_data_url)
     if not image:

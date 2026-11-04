@@ -177,6 +177,25 @@ def test_transcribe_ohne_freigabe_meldet_klar(monkeypatch):
     assert "hint" in result
 
 
+def test_transcribe_ohne_schluessel_nennt_die_ursache(monkeypatch):
+    """Ohne Schluessel muss der Hinweis den Schluessel nennen, nicht die Bilder."""
+    monkeypatch.setattr(handwriting, "available", lambda: False)
+    monkeypatch.setattr(handwriting.gemini, "is_configured", lambda: False)
+    result = asyncio.run(handwriting.transcribe(_png_data_url()))
+    assert result["ok"] is False
+    assert "Gemini-Schluessel" in result["error"]
+    assert "Bilder" not in result["hint"]
+
+
+def test_transcribe_ohne_bildfreigabe_nennt_die_option(monkeypatch):
+    monkeypatch.setattr(handwriting, "available", lambda: False)
+    monkeypatch.setattr(handwriting.gemini, "is_configured", lambda: True)
+    result = asyncio.run(handwriting.transcribe(_png_data_url()))
+    assert result["ok"] is False
+    assert "Bilder" in result["error"]
+    assert "Bilder an die Cloud senden" in result["hint"]
+
+
 def test_transcribe_nutzt_gemini(monkeypatch):
     monkeypatch.setattr(handwriting, "available", lambda: True)
 
