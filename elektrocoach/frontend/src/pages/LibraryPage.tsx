@@ -355,6 +355,7 @@ function PageTextEditor({
   const [text, setText] = useState(initialText);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     setText(initialText);
@@ -372,23 +373,70 @@ function PageTextEditor({
     }
   };
 
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
+
   return (
     <div>
       <label className="label" htmlFor={`page-${pageId}`}>
         Erkannter Text (bearbeitbar)
       </label>
+      <FormulaView text={text} />
       <textarea
         id={`page-${pageId}`}
-        className="input min-h-[140px] font-mono text-xs leading-relaxed"
+        className="input mt-2 min-h-[160px] font-mono text-xs leading-relaxed"
         value={text}
         onChange={(event) => setText(event.target.value)}
       />
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <button type="button" className="btn-secondary btn-sm" onClick={save} disabled={busy}>
           {busy ? "Speichern …" : "Text speichern"}
         </button>
+        <button type="button" className="btn-ghost btn-sm" onClick={copy} disabled={!text.trim()}>
+          {copied ? "Kopiert" : "Kopieren"}
+        </button>
         {saved && <span className="text-xs text-emerald-700">Gespeichert und neu indexiert.</span>}
       </div>
+    </div>
+  );
+}
+
+/** Zeilenweise Darstellung des erkannten Texts. Rechenzeilen erscheinen in
+ *  gleichbreiter Schrift, damit Formelzeichen untereinander ausgerichtet sind. */
+export function FormulaView({ text }: { text: string }) {
+  const lines = text.split("\n");
+  if (!text.trim()) {
+    return <p className="text-sm text-ink-500">Kein Text erkannt.</p>;
+  }
+  return (
+    <div className="max-h-80 overflow-auto rounded-lg border border-ink-100 bg-ink-50 p-3 text-sm leading-relaxed">
+      {lines.map((line, index) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={index} className="h-2" />;
+        const isFormula = /[=+\-*/·×]/.test(trimmed) && /\d|[A-Za-z]{1,3}\b/.test(trimmed);
+        const isHeading = /^\d+[.)]\s/.test(trimmed) || /^[a-z]\)\s/.test(trimmed);
+        return (
+          <div
+            key={index}
+            className={[
+              "whitespace-pre-wrap break-words",
+              isFormula ? "font-mono text-[13px]" : "",
+              isHeading ? "mt-2 font-semibold text-ink-800" : "text-ink-800",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {line}
+          </div>
+        );
+      })}
     </div>
   );
 }

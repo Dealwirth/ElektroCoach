@@ -1,5 +1,5 @@
 name: "ElektroCoach"
-version: "1.0.12"
+version: "1.0.14"
 slug: "elektrocoach"
 description: "KI-Lernplattform für Elektroniker Energie- und Gebäudetechnik mit OCR-Import, Lernsystem, Prüfungssimulation und Schaltplan-Editor"
 url: "https://github.com/Dealwirth/ElektroCoach/tree/main/elektrocoach"
@@ -37,10 +37,15 @@ options:
   gemini_vision_model: "gemini-flash-latest"
   ollama_url: "http://localhost:11434"
   ollama_model: "llama3.2:1b"
+  ollama_vision_model: "qwen2.5vl:3b"
+  ocr_refine_formulas: true
+  ollama_refine_model: ""
+  ocr_vision_use_draft: false
   ollama_enabled: false
   ocr_languages: "deu+eng"
   ocr_engine: "auto"
-  ocr_postprocess: "standard"
+  ocr_use_vision_model: true
+  ocr_postprocess: "formula"
   ai_mode: "auto"
   ai_timeout_seconds: 180
   refine_after_import: false
@@ -61,9 +66,14 @@ schema:
   gemini_vision_model: "str"
   ollama_url: "str"
   ollama_model: "str"
+  ollama_vision_model: "str"
+  ocr_refine_formulas: "bool"
+  ollama_refine_model: "str"
+  ocr_vision_use_draft: "bool"
   ollama_enabled: "bool"
   ocr_languages: "str"
   ocr_engine: "list(auto|trocr|tesseract)"
+  ocr_use_vision_model: "bool"
   ocr_postprocess: "list(off|light|standard|formula)"
   ai_mode: "list(auto|local_only|cloud_only|off)"
   ai_timeout_seconds: "int(30,900)"

@@ -74,11 +74,17 @@ def _tesseract_info() -> dict[str, Any]:
 
 
 def _handwriting_info() -> dict[str, Any]:
-    from ..services import handwriting
+    from ..services import handwriting, handwriting_vision
 
     info = handwriting.status()
     info["engine"] = settings.get("ocr_engine", "auto")
-    info["postprocess"] = settings.get("ocr_postprocess", "standard")
+    info["postprocess"] = settings.get("ocr_postprocess", "formula")
+    vision = handwriting_vision.status()
+    info["vision"] = {
+        "enabled": vision["enabled"],
+        "model": vision["model"],
+        "recommended": vision["recommended"],
+    }
     return info
 
 

@@ -85,6 +85,31 @@ def test_formeln_werden_normalisiert():
     assert "×" in handwriting_post.normalize_formulas("2x3")
 
 
+def test_latex_brueche_werden_lesbar():
+    result = handwriting_post.strip_latex(r"R = \frac{U}{I}")
+    assert result == "R = U / I"
+
+
+def test_latex_zeichen_werden_uebersetzt():
+    result = handwriting_post.strip_latex(r"U = R \cdot I = 0.5 \Omega")
+    assert "·" in result and "Ω" in result
+
+
+def test_latex_hochzahl_und_einheit():
+    result = handwriting_post.postprocess(r"A = \frac{0.0278 \cdot 2 \cdot m^2}{0.3 \cdot 2}", "formula")
+    assert "mm" not in result or "mm²" in result
+    assert "m²" in result
+    assert "," in result  # Dezimalkomma statt Punkt
+
+
+def test_postprocess_formula_ohne_latex_bleibt_stabil():
+    assert handwriting_post.postprocess("Leitung 16 A", "formula") == "Leitung 16 A"
+
+
+def test_tausenderpunkt_bleibt_erhalten():
+    assert handwriting_post.normalize_formulas("1.000 V") == "1.000 V"
+
+
 def test_postprocess_stufen():
     assert handwriting_post.postprocess("16a", "off") == "16a"
     assert handwriting_post.postprocess("16a", "light") == "16 A"
@@ -169,6 +194,67 @@ def test_ocr_engine_trocr_ohne_modell_meldet_fehler(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Bildmodell (Vision) als zweite Stufe
+# ---------------------------------------------------------------------------
+def test_vision_stage_uebernimmt_bildmodell(monkeypatch):
+    from app.services import handwriting_vision
+
+    settings.set_runtime("ocr_engine", "auto")
+    settings.set_runtime("ollama_enabled", True)
+    settings.set_runtime("ocr_use_vision_model", True)
+    monkeypatch.setattr(handwriting, "available", lambda: True)
+    monkeypatch.setattr(
+        handwriting, "transcribe_image",
+        lambda image: {"ok": True, "text": "R = h l A", "lines": 1,
+                       "confidence": 60.0, "error": None},
+    )
+
+    async def _fake_transcribe(image, draft=None, model_name=None):
+        return {"ok": True, "text": r"R = \frac{0,4 \cdot 2}{0,1} = 375 \Omega",
+                "model": "qwen2.5vl:3b", "error": None}
+
+    monkeypatch.setattr(handwriting_vision, "transcribe", _fake_transcribe)
+    result = ocr.recognize_image(_lines_image(1))
+    assert result["engine"] == "vision"
+    assert "375" in result["text"]
+    assert "Ω" in result["text"]
+    assert "\\frac" not in result["text"]
+
+
+def test_vision_stage_faellt_bei_fehler_zurueck(monkeypatch):
+    from app.services import handwriting_vision
+
+    settings.set_runtime("ollama_enabled", True)
+    settings.set_runtime("ocr_use_vision_model", True)
+    monkeypatch.setattr(handwriting, "available", lambda: True)
+    monkeypatch.setattr(
+        handwriting, "transcribe_image",
+        lambda image: {"ok": True, "text": "16a leitung", "lines": 1,
+                       "confidence": 80.0, "error": None},
+    )
+
+    async def _fail(image, draft=None, model_name=None):
+        raise RuntimeError("Ollama nicht erreichbar")
+
+    monkeypatch.setattr(handwriting_vision, "transcribe", _fail)
+    result = ocr.recognize_image(_lines_image(1))
+    assert result["engine"] == "trocr"
+    assert result["text"] == "16 A Leitung"
+
+
+def test_vision_aus_laesst_trocr_ergebnis_unveraendert(monkeypatch):
+    settings.set_runtime("ocr_use_vision_model", False)
+    monkeypatch.setattr(handwriting, "available", lambda: True)
+    monkeypatch.setattr(
+        handwriting, "transcribe_image",
+        lambda image: {"ok": True, "text": "16a", "lines": 1,
+                       "confidence": 80.0, "error": None},
+    )
+    result = ocr.recognize_image(_lines_image(1))
+    assert result["engine"] == "trocr"
+
+
+# ---------------------------------------------------------------------------
 # Endpunkt
 # ---------------------------------------------------------------------------
 def test_system_info_enthaelt_handschrift_status(client):
@@ -178,6 +264,8 @@ def test_system_info_enthaelt_handschrift_status(client):
     assert "handwriting" in body
     assert "available" in body["handwriting"]
     assert "dependencies" in body["handwriting"]
+    assert "vision" in body["handwriting"]
+    assert "model" in body["handwriting"]["vision"]
 
 
 # ---------------------------------------------------------------------------
@@ -199,3 +287,45 @@ def test_echtes_modell_liest_eine_zeile(monkeypatch):
     assert result["ok"] is True
     assert result["lines"] >= 1
     assert result["confidence"] is not None
+
+
+# ---------------------------------------------------------------------------
+# Zeilenweises Lesen (Bildmodell)
+# ---------------------------------------------------------------------------
+def test_line_image_skaliert_kleine_zeile():
+    from app.services import handwriting_vision
+
+    line = Image.new("RGB", (400, 40), color=255)
+    scaled = handwriting_vision._line_image(line)
+    assert scaled.height == handwriting_vision.LINE_TARGET_HEIGHT
+    assert scaled.width == 400 * handwriting_vision.LINE_TARGET_HEIGHT // 40
+
+
+def test_line_image_laesst_grosse_zeile_unveraendert():
+    from app.services import handwriting_vision
+
+    line = Image.new("RGB", (500, 400), color=255)
+    assert handwriting_vision._line_image(line).size == (500, 400)
+
+
+def test_line_slices_teilt_ueberlange_zeile():
+    from app.services import handwriting_vision
+
+    line = Image.new("RGB", (handwriting_vision.LINE_MAX_WIDTH * 2, 256), color=255)
+    parts = handwriting_vision._line_slices(line)
+    assert len(parts) >= 2
+    assert all(part.width <= handwriting_vision.LINE_MAX_WIDTH * 1.2 for part in parts)
+
+
+def test_line_slices_laesst_kurze_zeile():
+    from app.services import handwriting_vision
+
+    line = Image.new("RGB", (600, 256), color=255)
+    assert len(handwriting_vision._line_slices(line)) == 1
+
+
+def test_merge_lines_entfernt_doppelte_naht():
+    from app.services import handwriting_vision
+
+    merged = handwriting_vision._merge_lines(["R = 1", "R = 1", "U = 2"])
+    assert merged == "R = 1\nU = 2"

@@ -32,11 +32,15 @@ def _today() -> str:
 
 
 def record(provider: str, model: str, task: str, ok: bool, error: str | None = None) -> None:
-    db.insert(
-        "INSERT INTO ai_usage(id, provider, model, task, ok, error, day, created_at) "
-        "VALUES(?,?,?,?,?,?,?,?)",
-        (db.new_id(), provider, model, task, 1 if ok else 0, error, _today(), db.now()),
-    )
+    """Protokolliert einen Aufruf. Ein Protokollfehler darf die KI nicht stoeren."""
+    try:
+        db.insert(
+            "INSERT INTO ai_usage(id, provider, model, task, ok, error, day, created_at) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            (db.new_id(), provider, model, task, 1 if ok else 0, error, _today(), db.now()),
+        )
+    except Exception as exc:  # noqa: BLE001 - Protokoll ist nachrangig
+        log.debug("Nutzung konnte nicht protokolliert werden: %s", exc)
 
 
 def usage_today() -> dict[str, Any]:

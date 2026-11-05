@@ -49,8 +49,21 @@ DEFAULTS: dict[str, Any] = {
     # Handschrift-OCR: "auto" (TrOCR, Tesseract als Rueckfall), "trocr" oder
     # "tesseract". TrOCR liest deutsche Handschrift deutlich besser.
     "ocr_engine": "auto",
+    # Zusaetzlich ein lokales Bildmodell (Ollama) auf die Seite ansetzen. Es
+    # erkennt Rechenwege und Formeln, an denen TrOCR scheitert. Braucht ein
+    # installiertes Vision-Modell; sonst bleibt es wirkungslos.
+    "ocr_use_vision_model": True,
+    "ollama_vision_model": "qwen2.5vl:3b",
+    # Zusaetzlich die Formelzeichen mit einem Textmodell berichtigen lassen.
+    # Das Bildmodell liest Zahlen gut, verwechselt aber rho mit h oder g.
+    "ocr_refine_formulas": True,
+    # Textmodell fuer die Formelkorrektur (leer = ollama_model).
+    "ollama_refine_model": "",
+    # TrOCR-Entwurf als Hinweis an das Bildmodell geben. Bei schwerer
+    # Handschrift schadet der Entwurf mehr, als er nuetzt.
+    "ocr_vision_use_draft": False,
     # Nachbearbeitung: off | light | standard | formula
-    "ocr_postprocess": "standard",
+    "ocr_postprocess": "formula",
     # Maximale Zeilenlaenge (Token) je TrOCR-Durchlauf.
     "ocr_trocr_max_tokens": 128,
     "use_ai_for_ocr": False,

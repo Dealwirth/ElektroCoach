@@ -15,6 +15,14 @@ import { getThemeMode, setThemeMode, type ThemeMode } from "../theme";
 
 type TabId = "ki" | "homeassistant" | "darstellung" | "lernen" | "import" | "sicherheit";
 
+// Muss zur Liste in app/services/ollama.py passen (nur Bildmodelle).
+const VISION_MODELS = [
+  { name: "qwen2.5vl:3b", size_gb: 3.2, note: "Beste lokale Handschrift-/Formelerkennung (empfohlen)" },
+  { name: "gemma3:4b", size_gb: 3.3, note: "Mehrsprachig, braucht länger" },
+  { name: "minicpm-v:8b", size_gb: 5.5, note: "Sehr genau, groß und langsam" },
+  { name: "llava:7b", size_gb: 4.7, note: "Älteres Vision-Modell" },
+];
+
 export default function SettingsPage() {
   const [tab, setTab] = useState<TabId>("ki");
   const settings = useAsync(() => api.settings(), []);
@@ -477,6 +485,53 @@ function KiSettings({ values, set, save, busy }: TabProps) {
 
       <Card>
         <SectionTitle
+          title="Bildmodell für Handschrift und Formeln"
+          subtitle="Ein lokales Bildmodell liest Rechenwege und Formeln, an denen die Zeichenerkennung scheitert."
+        />
+        <div className="space-y-4">
+          <Toggle
+            id="ocr_use_vision_model"
+            label="Bildmodell zur Handschrifterkennung nutzen"
+            checked={Boolean(values.ocr_use_vision_model)}
+            onChange={(value) => set("ocr_use_vision_model", value)}
+            hint="Erst TrOCR, dann liest das Bildmodell die Seite erneut und korrigiert Formeln. Braucht Ollama und ein Bildmodell."
+          />
+          <Text
+            id="ollama_vision_model"
+            label="Bildmodell"
+            value={String(values.ollama_vision_model ?? "")}
+            onChange={(value) => set("ollama_vision_model", value)}
+            hint="Empfohlen: qwen2.5vl:3b. Nur Modelle mit Bildunterstützung eignen sich."
+          />
+          <div className="rounded-xl bg-ink-50 p-3 text-xs text-ink-600">
+            <p className="font-semibold text-ink-700">Bildmodelle (lesen Handschrift und Formeln)</p>
+            <ul className="mt-1.5 space-y-1">
+              {VISION_MODELS.map((model) => (
+                <li key={model.name}>
+                  <button type="button" className="text-left hover:underline" onClick={() => set("ollama_vision_model", model.name)}>
+                    <span className="font-mono">{model.name}</span> · {model.size_gb} GB · {model.note}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2">
+              Fehlt das Modell, lässt es sich oben unter „Modell herunterladen“ installieren. Auf dem
+              Raspberry Pi 4 dauert eine Seite damit mehrere Minuten – dafür bleibt alles offline und kostenlos.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => save(["ocr_use_vision_model", "ollama_vision_model", "ollama_enabled"])}
+            disabled={busy}
+          >
+            Speichern
+          </button>
+        </div>
+      </Card>
+
+      <Card>
+        <SectionTitle
           title="Cloud (Gemini Free Tier)"
           subtitle="Für anspruchsvolle Handschrift, Bilder und schwierige Fachfragen."
         />
@@ -918,14 +973,15 @@ function ImportSettings({ values, set, save, busy }: TabProps) {
         <Select
           id="ocr_postprocess"
           label="Nachbearbeitung der Erkennung"
-          value={String(values.ocr_postprocess ?? "standard")}
+          value={String(values.ocr_postprocess ?? "formula")}
           onChange={(value) => set("ocr_postprocess", value)}
           options={[
             { value: "off", label: "Aus" },
             { value: "light", label: "Leicht (Einheiten, Akronyme)" },
-            { value: "standard", label: "Standard (plus Fachbegriffe, Formeln)" },
+            { value: "standard", label: "Standard (plus Fachbegriffe)" },
+            { value: "formula", label: "Formeln (plus Rechenwege, LaTeX → lesbar)" },
           ]}
-          hint="Standard korrigiert Einheiten (30mA → 30 mA) und gleicht Fachbegriffe ab."
+          hint="Formeln übersetzt Rechenwege lesbar (Brüche, ρ, Ω, mm²) und korrigiert Fachbegriffe."
         />
         <Toggle
           id="use_ai_for_ocr"

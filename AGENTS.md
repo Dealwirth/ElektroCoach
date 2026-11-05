@@ -112,6 +112,24 @@ Kontingent). Ziel: Raspberry Pi 4, 8 GB, Home Assistant OS, aarch64.
       musllinux-Wheels auf PyPI); `tokenizers` per `--no-deps` (nur das
       native musl-Wheel wird gebraucht).
     Status unter `handwriting` in `GET /api/system/info`.
+15. **Handschrift braucht das Bildmodell Zeile fuer Zeile.** TrOCR erkennt
+    einzelne *gedruckte* Zeilen gut, scheitert aber an verbundener Handschrift
+    mit Formeln: auf dem Referenzbild (Rechenwege zum Leiterwiderstand) liefert
+    es eine Wiederholungsschleife statt Text. Das Bildmodell liest die Seite
+    deshalb Zeile fuer Zeile:
+    * Jede Zeile wird auf 256 px Hoehe skaliert und **einzeln** gelesen. Die
+      ganze Seite in einem Zug zu lesen laesst das Modell Zahlen erfinden
+      (0,49 → 0,4; 375 → 3·5√2).
+    * `qwen2.5vl:3b` reicht fuer saubere Schrift, verwechselt aber ρ mit h/g und
+      liest Nenner falsch. `qwen2.5vl:7b` ist deutlich besser (84 % statt 70 %
+      der Zahlen korrekt, ρ wird erkannt) und ist die Wahl fuer schwere Seiten.
+      Preis: ~2 min je Zeile auf CPU, ~25 min je Seite.
+    * Der TrOCR-Entwurf als Hinweis **schadet** bei Handschrift (er zieht das
+      Bildmodell auf das Kauderwelsch). Standard: `ocr_vision_use_draft: false`.
+    * Der 7b-Lauf braucht ~7 GB RAM; auf kleinen Maschinen bleibt 3b.
+    * Das Bildmodell darf das Seitenbild nicht roh bekommen: erst
+      `handwriting.preprocess()` (Seite freistellen, begradigen), sonst liest
+      es den Bildschirmrahmen mit.
 
 ## Git
 
