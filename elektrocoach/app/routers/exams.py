@@ -6,9 +6,11 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from ..services import exam as exam_service
+from ..services import exam_pdf
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +58,27 @@ async def get_exam(exam_id: str) -> dict[str, Any]:
     if not exam:
         raise HTTPException(status_code=404, detail="Pruefung nicht gefunden")
     return exam
+
+
+@router.get("/exams/{exam_id}/pdf")
+async def download_exam_pdf(exam_id: str, solutions: bool = False) -> Response:
+    """Liefert die Pruefung als druckfertiges PDF."""
+    exam = exam_service.get_exam(exam_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Pruefung nicht gefunden")
+    try:
+        data = exam_pdf.build_exam_pdf(exam_id, include_solutions=solutions)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("PDF-Erzeugung fehlgeschlagen")
+        raise HTTPException(status_code=500, detail=f"PDF konnte nicht erzeugt werden: {exc}") from exc
+    if not data:
+        raise HTTPException(status_code=404, detail="Pruefung nicht gefunden")
+    filename = exam_pdf.exam_filename(exam, solutions=solutions)
+    return Response(
+        content=data,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/exams/{exam_id}/start")

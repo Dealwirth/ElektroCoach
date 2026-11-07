@@ -1,0 +1,9 @@
+# Handschrift-OCR (TrOCR).
+#
+# Wird mit --no-deps installiert: tokenizers bringt die Tokenizer-Bibliothek
+# als native musl-Wheel mit; die uebrigen Python-Abhaengigkeiten (requests,
+# huggingface-hub, ...) braucht der Offline-Betrieb nicht.
+#
+# numpy und onnxruntime kommen als Alpine-Pakete (py3-numpy, py3-onnxruntime),
+# weil es fuer sie keine musllinux-Wheels auf PyPI gibt.
+tokenizers>=0.20,<0.24

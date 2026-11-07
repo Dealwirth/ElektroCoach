@@ -128,6 +128,20 @@ function ExamList({
                   </button>
                   <button
                     type="button"
+                    className="btn-ghost btn-sm"
+                    title="Als PDF herunterladen"
+                    onClick={async () => {
+                      try {
+                        await api.downloadExamPdf(exam.id);
+                      } catch (error) {
+                        onMessage({ tone: "danger", text: error instanceof ApiError ? error.message : String(error) });
+                      }
+                    }}
+                  >
+                    PDF
+                  </button>
+                  <button
+                    type="button"
                     className="btn-ghost btn-sm text-red-600"
                     onClick={async () => {
                       if (!window.confirm("Prüfung löschen?")) return;
@@ -451,7 +465,17 @@ function ExamRunner({
   if (result) {
     return (
       <div className="space-y-5">
-        <PageHeader title="Prüfungsergebnis" subtitle={result.name} actions={<button type="button" className="btn-secondary" onClick={onExit}>Zur Übersicht</button>} />
+        <PageHeader title="Prüfungsergebnis" subtitle={result.name} actions={
+          <>
+            <button type="button" className="btn-secondary" onClick={() => void api.downloadExamPdf(examId)}>
+              PDF
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => void api.downloadExamPdf(examId, true)}>
+              PDF mit Lösungen
+            </button>
+            <button type="button" className="btn-secondary" onClick={onExit}>Zur Übersicht</button>
+          </>
+        } />
         <div className="grid gap-4 sm:grid-cols-4">
           <Card>
             <p className="text-sm text-ink-500">Erreichte Punkte</p>
@@ -540,6 +564,20 @@ function ExamRunner({
             </span>
             <button type="button" className="btn-primary" onClick={() => setShowFinish(true)}>
               Prüfung abgeben
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              title="Prüfung als PDF herunterladen"
+              onClick={async () => {
+                try {
+                  await api.downloadExamPdf(exam.id);
+                } catch (err) {
+                  onMessage({ tone: "danger", text: err instanceof ApiError ? err.message : String(err) });
+                }
+              }}
+            >
+              PDF
             </button>
             <button type="button" className="btn-ghost" onClick={onExit}>
               Später

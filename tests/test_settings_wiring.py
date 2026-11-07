@@ -45,6 +45,28 @@ def test_ocr_dpi_wird_begrenzt():
     assert ocr._render_scale() == pytest.approx(150 / 72)
 
 
+def test_ocr_engine_kommt_aus_den_einstellungen():
+    settings.set_runtime("ocr_engine", "trocr")
+    assert ocr._engine_mode() == "trocr"
+    settings.set_runtime("ocr_engine", "tesseract")
+    assert ocr._engine_mode() == "tesseract"
+    # Unbekannte Werte fallen auf "auto" zurueck.
+    settings.set_runtime("ocr_engine", "quatsch")
+    assert ocr._engine_mode() == "auto"
+
+
+def test_ocr_postprocess_stufe_kommt_aus_den_einstellungen():
+    settings.set_runtime("ocr_postprocess", "off")
+    assert ocr._postprocess("30ma") == "30ma"
+    settings.set_runtime("ocr_postprocess", "light")
+    assert ocr._postprocess("30ma") == "30 mA"
+    settings.set_runtime("ocr_postprocess", "standard")
+    assert ocr._postprocess("30ma") == "30 mA"
+    # Unbekannte Werte fallen auf "standard" zurueck.
+    settings.set_runtime("ocr_postprocess", "quatsch")
+    assert ocr._post_level() == "standard"
+
+
 def test_exam_bestehensgrenze_kommt_aus_den_einstellungen():
     settings.set_runtime("exam_pass_percent", 80)
     assert settings.get_int("exam_pass_percent", 50) == 80

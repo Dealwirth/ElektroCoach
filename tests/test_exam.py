@@ -61,7 +61,7 @@ def test_pruefung_ohne_fragen_wird_abgelehnt():
     result = exam_service.create_exam(question_count=5)
     if not db.query("SELECT id FROM questions LIMIT 1"):
         assert result["ok"] is False
-        assert "keine Fragen" in result["error"].lower()
+        assert "keine fragen" in result["error"].lower()
 
 
 def test_pruefung_erstellen_mit_gemischten_aufgaben(question_pool):
@@ -178,6 +178,53 @@ def test_unbekannte_pruefung_liefert_none():
 def test_auswerten_unbekannter_pruefung_wirft_fehler():
     with pytest.raises(ValueError):
         _run(exam_service.finish_exam("gibt-es-nicht"))
+
+
+def test_pruefung_pdf_erzeugen(question_pool):
+    from app.services import exam_pdf
+
+    exam = exam_service.create_exam(name="PDF-Test", question_count=4, total_points=40)["exam"]
+    data = exam_pdf.build_exam_pdf(exam["id"])
+    assert data and data[:4] == b"%PDF"
+    assert exam_pdf.build_exam_pdf("gibt-es-nicht") is None
+
+
+def test_pruefung_pdf_mit_loesungen_enthaelt_musterloesung(question_pool):
+    from app.services import exam_pdf
+
+    exam = exam_service.create_exam(name="PDF-Loesung", question_count=3, total_points=30)["exam"]
+    data = exam_pdf.build_exam_pdf(exam["id"], include_solutions=True)
+    assert data and data[:4] == b"%PDF"
+    # Musterloesungen duerfen erst im Loesungsblatt erscheinen, nicht in
+    # ``get_exam`` waehrend einer laufenden Pruefung.
+    reloaded = exam_service.get_exam(exam["id"])
+    assert all("solution_steps" not in q for q in reloaded["questions"])
+    assert all("model_answer" not in q for q in reloaded["questions"])
+
+
+def test_pruefung_pdf_dateiname(question_pool):
+    from app.services import exam_pdf
+
+    exam = exam_service.create_exam(name="Abschlussprüfung Nr. 1", question_count=2)["exam"]
+    name = exam_pdf.exam_filename(exam)
+    assert name.endswith(".pdf")
+    assert "/" not in name and "ü" not in name
+    assert exam_pdf.exam_filename(exam, solutions=True).endswith("_Loesungen.pdf")
+
+
+def test_pruefung_pdf_endpunkt_liefert_pdf(client, question_pool):
+    exam = exam_service.create_exam(name="PDF-Endpunkt", question_count=3)["exam"]
+    response = client.get(f"/api/exams/{exam['id']}/pdf")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/pdf"
+    assert response.content[:4] == b"%PDF"
+    assert "attachment" in response.headers["content-disposition"]
+
+    solutions = client.get(f"/api/exams/{exam['id']}/pdf?solutions=true")
+    assert solutions.status_code == 200
+    assert solutions.content[:4] == b"%PDF"
+
+    assert client.get("/api/exams/gibt-es-nicht/pdf").status_code == 404
 
 
 def _question_detail(question_id: str) -> dict:

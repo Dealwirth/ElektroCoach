@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -97,10 +98,22 @@ async def list_jobs(limit: int = 10) -> dict[str, Any]:
 
     rows = db.query(
         "SELECT id, status, total_files, processed_files, failed_files, current_item, "
-        "message, created_at, updated_at FROM import_jobs ORDER BY created_at DESC LIMIT ?",
+        "message, created_at, updated_at, stats_json FROM import_jobs "
+        "ORDER BY created_at DESC LIMIT ?",
         (max(1, min(50, limit)),),
     )
-    return {"items": [dict(r) for r in rows], "queue": import_worker.queue_length()}
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        stats: dict[str, Any] = {}
+        try:
+            stats = json.loads(item.pop("stats_json", "") or "{}")
+        except json.JSONDecodeError:
+            stats = {}
+        item["imported"] = stats.get("imported", 0)
+        item["duplicates"] = stats.get("duplicates", 0)
+        items.append(item)
+    return {"items": items, "queue": import_worker.queue_length()}
 
 
 @router.get("/import/jobs/{job_id}")
@@ -108,7 +121,6 @@ async def get_job(job_id: str) -> dict[str, Any]:
     job = import_worker.job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Importauftrag nicht gefunden")
-    import json
 
     stats: dict[str, Any] = {}
     try:

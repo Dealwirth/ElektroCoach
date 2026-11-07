@@ -59,6 +59,7 @@ async def system_info() -> dict[str, Any]:
         "ai": ai,
         "ha": ha_integration.status(),
         "tesseract": _tesseract_info(),
+        "handwriting": _handwriting_info(),
     }
 
 
@@ -70,6 +71,21 @@ def _tesseract_info() -> dict[str, Any]:
         "languages": ocr.tesseract_languages(),
         "configured": settings.get("ocr_languages", "deu+eng"),
     }
+
+
+def _handwriting_info() -> dict[str, Any]:
+    from ..services import handwriting, handwriting_vision
+
+    info = handwriting.status()
+    info["engine"] = settings.get("ocr_engine", "auto")
+    info["postprocess"] = settings.get("ocr_postprocess", "formula")
+    vision = handwriting_vision.status()
+    info["vision"] = {
+        "enabled": vision["enabled"],
+        "model": vision["model"],
+        "recommended": vision["recommended"],
+    }
+    return info
 
 
 @router.get("/settings")

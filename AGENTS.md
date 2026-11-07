@@ -101,6 +101,57 @@ Kontingent). Ziel: Raspberry Pi 4, 8 GB, Home Assistant OS, aarch64.
 13. **`OLLAMA_FLASH_ATTENTION=1` bei quantisiertem KV-Cache.** Ist
     `OLLAMA_KV_CACHE_TYPE=q8_0` gesetzt und Flash-Attention aus, antwortet das
     Ollama-Add-on auf jede Anfrage mit HTTP 500.
+14. **Handschrift nur mit TrOCR, nicht mit Tesseract.** Tesseract erreicht auf
+    deutscher Handschrift rund 52 % Zeichenfehler, das mitgelieferte
+    TrOCR-Modell (`models/trocr-de`, int8-ONNX) 0,5 %. Drei Fallstricke:
+    * Das Bild **seitenverhältnis-treu** auf 384 × 384 stauchen. Mit weißem
+      Rand auffüllen kostet 76 % statt 0,4 % CER.
+    * Kein KV-Cache im Decoder. Er bringt 2,3× Tempo, liefert aber andere
+      Tokens – Korrektheit geht vor.
+    * `py3-numpy` und `py3-onnxruntime` kommen als Alpine-Pakete (keine
+      musllinux-Wheels auf PyPI); `tokenizers` per `--no-deps` (nur das
+      native musl-Wheel wird gebraucht).
+    Status unter `handwriting` in `GET /api/system/info`.
+15. **Handschrift braucht das Bildmodell Zeile fuer Zeile.** TrOCR erkennt
+    einzelne *gedruckte* Zeilen gut, scheitert aber an verbundener Handschrift
+    mit Formeln: auf dem Referenzbild (Rechenwege zum Leiterwiderstand) liefert
+    es eine Wiederholungsschleife statt Text. Das Bildmodell liest die Seite
+    deshalb Zeile fuer Zeile:
+    * Jede Zeile wird auf 256 px Hoehe skaliert und **einzeln** gelesen. Die
+      ganze Seite in einem Zug zu lesen laesst das Modell Zahlen erfinden
+      (0,49 → 0,4; 375 → 3·5√2).
+    * `qwen2.5vl:3b` reicht fuer saubere Schrift, verwechselt aber ρ mit h/g und
+      liest Nenner falsch. `qwen2.5vl:7b` ist deutlich besser (84 % statt 70 %
+      der Zahlen korrekt, ρ wird erkannt) und ist die Wahl fuer schwere Seiten.
+      Preis: ~2 min je Zeile auf CPU, ~25 min je Seite.
+    * Der TrOCR-Entwurf als Hinweis **schadet** bei Handschrift (er zieht das
+      Bildmodell auf das Kauderwelsch). Standard: `ocr_vision_use_draft: false`.
+    * Der 7b-Lauf braucht ~7 GB RAM; auf kleinen Maschinen bleibt 3b.
+    * Das Bildmodell darf das Seitenbild nicht roh bekommen: erst
+      `handwriting.preprocess()` (Seite freistellen, begradigen), sonst liest
+      es den Bildschirmrahmen mit.
+
+16. **Handschrift: die Einzelzeilen-Lesung ist der Anker.** Jede Zeile wird
+    zusätzlich ganz allein gelesen (`ocr_vision_isolated`). Ohne Nachbarzeilen
+    entfällt die Verwechslung benachbarter Zahlen. Diese Lesung dient als Bezug
+    für den Zeilenabgleich und zählt `ocr_vision_reference_weight`-fach (Standard
+    2). Sie darf nicht ein zweites Mal als gewöhnliche Stimme zählen.
+17. **Zweitmodell hilft hier nicht.** `qwen2.5vl:3b` liefert auf der
+    Handschrift deutlich weniger Zahlen als `qwen2.5vl:7b` und verschlechtert den
+    Konsens (gemessen). `ocr_vision_models` leer lassen. Auch das deutsche
+    TrOCR-Modell liefert nur wenige Zahlen und taugt hier nicht als Stimme.
+18. **Höhere Auflösung bringt nichts, kostet viel.** Einzelzeilen bei 512/640 px
+    Höhe brauchen auf dem Pi ein Vielfaches der Zeit und verlieren dieselben
+    kleinen Indizes. Bei großen Einzelbildern (hohe Auflösung) das Kontextfenster
+    (`num_ctx`) mitziehen, sonst antwortet Ollama mit HTTP 400 „exceeds the
+    available context size".
+19. **Kleine Indizes sind die harte Grenze.** Ziffern wie `0,196`, `1,5`, `2,5`,
+    `3,56` (tiefgestellt, klein) erkennt das Bildmodell nicht zuverlässig. Diese
+    Stellen bleiben der Korrektur-Oberfläche überlassen; nicht als Automatik
+    ausgeben, sondern zur Kontrolle markieren.
+20. **Kennzahlen richtig messen.** `mm²` darf nicht als Ziffer `2` gezählt
+    werden: hochgestellte Zeichen vor dem Zählen entfernen. Sonst ist die
+    Trefferquote künstlich hoch.
 
 ## Git
 

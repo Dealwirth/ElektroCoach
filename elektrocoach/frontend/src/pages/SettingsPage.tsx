@@ -15,6 +15,14 @@ import { getThemeMode, setThemeMode, type ThemeMode } from "../theme";
 
 type TabId = "ki" | "homeassistant" | "darstellung" | "lernen" | "import" | "sicherheit";
 
+// Muss zur Liste in app/services/ollama.py passen (nur Bildmodelle).
+const VISION_MODELS = [
+  { name: "qwen2.5vl:3b", size_gb: 3.2, note: "Beste lokale Handschrift-/Formelerkennung (empfohlen)" },
+  { name: "gemma3:4b", size_gb: 3.3, note: "Mehrsprachig, braucht länger" },
+  { name: "minicpm-v:8b", size_gb: 5.5, note: "Sehr genau, groß und langsam" },
+  { name: "llava:7b", size_gb: 4.7, note: "Älteres Vision-Modell" },
+];
+
 export default function SettingsPage() {
   const [tab, setTab] = useState<TabId>("ki");
   const settings = useAsync(() => api.settings(), []);
@@ -272,6 +280,36 @@ function Toggle({ id, label, checked, onChange, hint }: {
   );
 }
 
+function Select({ id, label, value, onChange, options, hint }: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+  hint?: string;
+}) {
+  return (
+    <div>
+      <label className="label" htmlFor={id}>
+        {label}
+      </label>
+      <select
+        id={id}
+        className="input"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {hint && <p className="mt-1 text-xs text-ink-500">{hint}</p>}
+    </div>
+  );
+}
+
 function KiSettings({ values, set, save, busy }: TabProps) {
   const [status, setStatus] = useState<import("../types").AiStatus | null>(null);
   const [models, setModels] = useState<Record<string, unknown> | null>(null);
@@ -440,6 +478,53 @@ function KiSettings({ values, set, save, busy }: TabProps) {
             </ul>
           </div>
           <button type="button" className="btn-primary" onClick={() => save(["ollama_enabled", "ollama_url", "ollama_model"])} disabled={busy}>
+            Speichern
+          </button>
+        </div>
+      </Card>
+
+      <Card>
+        <SectionTitle
+          title="Bildmodell für Handschrift und Formeln"
+          subtitle="Ein lokales Bildmodell liest Rechenwege und Formeln, an denen die Zeichenerkennung scheitert."
+        />
+        <div className="space-y-4">
+          <Toggle
+            id="ocr_use_vision_model"
+            label="Bildmodell zur Handschrifterkennung nutzen"
+            checked={Boolean(values.ocr_use_vision_model)}
+            onChange={(value) => set("ocr_use_vision_model", value)}
+            hint="Erst TrOCR, dann liest das Bildmodell die Seite erneut und korrigiert Formeln. Braucht Ollama und ein Bildmodell."
+          />
+          <Text
+            id="ollama_vision_model"
+            label="Bildmodell"
+            value={String(values.ollama_vision_model ?? "")}
+            onChange={(value) => set("ollama_vision_model", value)}
+            hint="Empfohlen: qwen2.5vl:3b. Nur Modelle mit Bildunterstützung eignen sich."
+          />
+          <div className="rounded-xl bg-ink-50 p-3 text-xs text-ink-600">
+            <p className="font-semibold text-ink-700">Bildmodelle (lesen Handschrift und Formeln)</p>
+            <ul className="mt-1.5 space-y-1">
+              {VISION_MODELS.map((model) => (
+                <li key={model.name}>
+                  <button type="button" className="text-left hover:underline" onClick={() => set("ollama_vision_model", model.name)}>
+                    <span className="font-mono">{model.name}</span> · {model.size_gb} GB · {model.note}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2">
+              Fehlt das Modell, lässt es sich oben unter „Modell herunterladen“ installieren. Auf dem
+              Raspberry Pi 4 dauert eine Seite damit mehrere Minuten – dafür bleibt alles offline und kostenlos.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => save(["ocr_use_vision_model", "ollama_vision_model", "ollama_enabled"])}
+            disabled={busy}
+          >
             Speichern
           </button>
         </div>
@@ -867,11 +952,107 @@ function ImportSettings({ values, set, save, busy }: TabProps) {
         <NumberField
           id="ocr_dpi"
           label="Auflösung für OCR (DPI)"
-          value={Number(values.ocr_dpi ?? 300)}
+          value={Number(values.ocr_dpi ?? 150)}
           onChange={(value) => set("ocr_dpi", value)}
           min={150}
           max={600}
           hint="150 DPI ist der Standard. Höhere Werte erkennen Handschrift besser, brauchen aber mehr Speicher und Zeit."
+        />
+        <Select
+          id="ocr_engine"
+          label="Texterkennung (Engine)"
+          value={String(values.ocr_engine ?? "auto")}
+          onChange={(value) => set("ocr_engine", value)}
+          options={[
+            { value: "auto", label: "Automatisch (Handschrift bevorzugt)" },
+            { value: "trocr", label: "Handschrift-Modell (TrOCR, lokal)" },
+            { value: "tesseract", label: "Tesseract (nur Druckschrift)" },
+          ]}
+          hint="Automatisch nutzt das lokale Handschrift-Modell und fällt ohne Modell auf Tesseract zurück."
+        />
+        <Select
+          id="ocr_postprocess"
+          label="Nachbearbeitung der Erkennung"
+          value={String(values.ocr_postprocess ?? "formula")}
+          onChange={(value) => set("ocr_postprocess", value)}
+          options={[
+            { value: "off", label: "Aus" },
+            { value: "light", label: "Leicht (Einheiten, Akronyme)" },
+            { value: "standard", label: "Standard (plus Fachbegriffe)" },
+            { value: "formula", label: "Formeln (plus Rechenwege, LaTeX → lesbar)" },
+          ]}
+          hint="Formeln übersetzt Rechenwege lesbar (Brüche, ρ, Ω, mm²) und korrigiert Fachbegriffe."
+        />
+        <NumberField
+          id="ocr_vision_group_size"
+          label="Zeilen je Leseabschnitt (Handschrift)"
+          value={Number(values.ocr_vision_group_size ?? 3)}
+          onChange={(value) => set("ocr_vision_group_size", value)}
+          min={1}
+          max={6}
+          hint="Handschrift wird blockweise gelesen. Drei Zeilen je Block ist der beste Kompromiss aus Genauigkeit und Tempo."
+        />
+        <NumberField
+          id="ocr_vision_passes"
+          label="Mehrfachlesungen je Abschnitt"
+          value={Number(values.ocr_vision_passes ?? 3)}
+          onChange={(value) => set("ocr_vision_passes", value)}
+          min={1}
+          max={3}
+          hint="Mehr Durchgänge bei verschiedenen Auflösungen erhöhen die Sicherheit der Zahlen deutlich. Mehr Zeit, nicht mehr Speicher."
+        />
+        <Text
+          id="ocr_vision_models"
+          label="Bildmodelle für die Mehrfachlesung"
+          value={String(values.ocr_vision_models ?? "")}
+          onChange={(value) => set("ocr_vision_models", value)}
+          hint="Mehrere Modelle kommagetrennt (z. B. qwen2.5vl:7b,qwen2.5vl:3b). Leer lassen: nur das Standardmodell. Zwei Modelle lesen deutlich zuverlässiger, brauchen aber länger."
+        />
+        <NumberField
+          id="ocr_timeout_seconds"
+          label="Zeitlimit je Bildaufruf (Sekunden)"
+          value={Number(values.ocr_timeout_seconds ?? 900)}
+          onChange={(value) => set("ocr_timeout_seconds", value)}
+          min={60}
+          max={3600}
+          hint="Auf dem Raspberry Pi 4 dauert ein Abschnitt leicht mehrere Minuten. Bei Abbrüchen den Wert erhöhen."
+        />
+        <Toggle
+          id="ocr_vision_windows"
+          label="Jede Zeile als eigener Leseabschnitt (Rückfall)"
+          checked={Boolean(values.ocr_vision_windows ?? true)}
+          onChange={(value) => set("ocr_vision_windows", value)}
+          hint="Ersatzweg, falls die Einzelzeilen-Lesung nichts liefert: jede Zeile beginnt einen eigenen Abschnitt. Die erste Zeile eines Abschnitts liest das Modell am zuverlässigsten."
+        />
+        <Toggle
+          id="ocr_vision_isolated"
+          label="Jede Zeile ganz allein lesen (genaueste Lesung)"
+          checked={Boolean(values.ocr_vision_isolated ?? true)}
+          onChange={(value) => set("ocr_vision_isolated", value)}
+          hint="Jede Zeile wird ohne Nachbarzeilen gelesen. Das ist die genaueste Lesung und der Bezug für alle weiteren Durchgänge. Kostet einen Aufruf je Zeile."
+        />
+        <NumberField
+          id="ocr_vision_reference_weight"
+          label="Gewicht der genauesten Lesung"
+          value={Number(values.ocr_vision_reference_weight ?? 2)}
+          onChange={(value) => set("ocr_vision_reference_weight", value)}
+          min={1}
+          max={5}
+          hint="Wie stark die Einzelzeilen-Lesung bei der Auswahl zählt. 2 = doppelt so schwer wie ein Blockdurchgang. Höhere Werte halten an der genauesten Lesung fest."
+        />
+        <Toggle
+          id="ocr_vision_full_page"
+          label="Zusätzlich die ganze Seite lesen"
+          checked={Boolean(values.ocr_vision_full_page ?? true)}
+          onChange={(value) => set("ocr_vision_full_page", value)}
+          hint="Eine zusätzliche Lesung der ganzen Seite als Gegenprobe. Wo ein Block ein Zeichen verliert, hilft der Seitenkontext."
+        />
+        <Toggle
+          id="ocr_vision_fraction_pass"
+          label="Zusätzlicher Bruch-Durchgang"
+          checked={Boolean(values.ocr_vision_fraction_pass ?? true)}
+          onChange={(value) => set("ocr_vision_fraction_pass", value)}
+          hint="Ein weiterer Durchgang mit ausdrücklichem Bruch-Hinweis holt Nenner zurück, die sonst verloren gehen."
         />
         <Toggle
           id="use_ai_for_ocr"
@@ -936,6 +1117,17 @@ function ImportSettings({ values, set, save, busy }: TabProps) {
           save([
             "ocr_languages",
             "ocr_dpi",
+            "ocr_engine",
+            "ocr_postprocess",
+            "ocr_vision_group_size",
+            "ocr_vision_passes",
+            "ocr_vision_models",
+            "ocr_timeout_seconds",
+            "ocr_vision_full_page",
+            "ocr_vision_fraction_pass",
+            "ocr_vision_windows",
+            "ocr_vision_isolated",
+            "ocr_vision_reference_weight",
             "use_ai_for_ocr",
             "keep_page_images",
             "import_max_parallel",
