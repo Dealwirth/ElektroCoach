@@ -983,6 +983,77 @@ function ImportSettings({ values, set, save, busy }: TabProps) {
           ]}
           hint="Formeln übersetzt Rechenwege lesbar (Brüche, ρ, Ω, mm²) und korrigiert Fachbegriffe."
         />
+        <NumberField
+          id="ocr_vision_group_size"
+          label="Zeilen je Leseabschnitt (Handschrift)"
+          value={Number(values.ocr_vision_group_size ?? 3)}
+          onChange={(value) => set("ocr_vision_group_size", value)}
+          min={1}
+          max={6}
+          hint="Handschrift wird blockweise gelesen. Drei Zeilen je Block ist der beste Kompromiss aus Genauigkeit und Tempo."
+        />
+        <NumberField
+          id="ocr_vision_passes"
+          label="Mehrfachlesungen je Abschnitt"
+          value={Number(values.ocr_vision_passes ?? 3)}
+          onChange={(value) => set("ocr_vision_passes", value)}
+          min={1}
+          max={3}
+          hint="Mehr Durchgänge bei verschiedenen Auflösungen erhöhen die Sicherheit der Zahlen deutlich. Mehr Zeit, nicht mehr Speicher."
+        />
+        <Text
+          id="ocr_vision_models"
+          label="Bildmodelle für die Mehrfachlesung"
+          value={String(values.ocr_vision_models ?? "")}
+          onChange={(value) => set("ocr_vision_models", value)}
+          hint="Mehrere Modelle kommagetrennt (z. B. qwen2.5vl:7b,qwen2.5vl:3b). Leer lassen: nur das Standardmodell. Zwei Modelle lesen deutlich zuverlässiger, brauchen aber länger."
+        />
+        <NumberField
+          id="ocr_timeout_seconds"
+          label="Zeitlimit je Bildaufruf (Sekunden)"
+          value={Number(values.ocr_timeout_seconds ?? 900)}
+          onChange={(value) => set("ocr_timeout_seconds", value)}
+          min={60}
+          max={3600}
+          hint="Auf dem Raspberry Pi 4 dauert ein Abschnitt leicht mehrere Minuten. Bei Abbrüchen den Wert erhöhen."
+        />
+        <Toggle
+          id="ocr_vision_windows"
+          label="Jede Zeile als eigener Leseabschnitt (Rückfall)"
+          checked={Boolean(values.ocr_vision_windows ?? true)}
+          onChange={(value) => set("ocr_vision_windows", value)}
+          hint="Ersatzweg, falls die Einzelzeilen-Lesung nichts liefert: jede Zeile beginnt einen eigenen Abschnitt. Die erste Zeile eines Abschnitts liest das Modell am zuverlässigsten."
+        />
+        <Toggle
+          id="ocr_vision_isolated"
+          label="Jede Zeile ganz allein lesen (genaueste Lesung)"
+          checked={Boolean(values.ocr_vision_isolated ?? true)}
+          onChange={(value) => set("ocr_vision_isolated", value)}
+          hint="Jede Zeile wird ohne Nachbarzeilen gelesen. Das ist die genaueste Lesung und der Bezug für alle weiteren Durchgänge. Kostet einen Aufruf je Zeile."
+        />
+        <NumberField
+          id="ocr_vision_reference_weight"
+          label="Gewicht der genauesten Lesung"
+          value={Number(values.ocr_vision_reference_weight ?? 2)}
+          onChange={(value) => set("ocr_vision_reference_weight", value)}
+          min={1}
+          max={5}
+          hint="Wie stark die Einzelzeilen-Lesung bei der Auswahl zählt. 2 = doppelt so schwer wie ein Blockdurchgang. Höhere Werte halten an der genauesten Lesung fest."
+        />
+        <Toggle
+          id="ocr_vision_full_page"
+          label="Zusätzlich die ganze Seite lesen"
+          checked={Boolean(values.ocr_vision_full_page ?? true)}
+          onChange={(value) => set("ocr_vision_full_page", value)}
+          hint="Eine zusätzliche Lesung der ganzen Seite als Gegenprobe. Wo ein Block ein Zeichen verliert, hilft der Seitenkontext."
+        />
+        <Toggle
+          id="ocr_vision_fraction_pass"
+          label="Zusätzlicher Bruch-Durchgang"
+          checked={Boolean(values.ocr_vision_fraction_pass ?? true)}
+          onChange={(value) => set("ocr_vision_fraction_pass", value)}
+          hint="Ein weiterer Durchgang mit ausdrücklichem Bruch-Hinweis holt Nenner zurück, die sonst verloren gehen."
+        />
         <Toggle
           id="use_ai_for_ocr"
           label="KI für schwierige Handschrift verwenden"
@@ -1048,6 +1119,15 @@ function ImportSettings({ values, set, save, busy }: TabProps) {
             "ocr_dpi",
             "ocr_engine",
             "ocr_postprocess",
+            "ocr_vision_group_size",
+            "ocr_vision_passes",
+            "ocr_vision_models",
+            "ocr_timeout_seconds",
+            "ocr_vision_full_page",
+            "ocr_vision_fraction_pass",
+            "ocr_vision_windows",
+            "ocr_vision_isolated",
+            "ocr_vision_reference_weight",
             "use_ai_for_ocr",
             "keep_page_images",
             "import_max_parallel",

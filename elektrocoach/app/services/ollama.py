@@ -115,11 +115,14 @@ async def chat(
     num_ctx: int = 4096,
     model_name: str | None = None,
     num_predict: int = 1024,
+    timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
     """Fuehrt einen Chat-Aufruf aus. Gibt {ok, text, error, provider, model} zurueck.
 
     ``model_name`` uebersteuert das eingestellte Modell. Fuer Bilder ist das
     noetig, weil nur Vision-Modelle Bilder annehmen.
+    ``timeout_seconds`` uebersteuert das Lesezeitlimit. Die Bilderkennung
+    braucht auf einem Raspberry Pi deutlich laenger als ein Textaufruf.
     """
     if not is_enabled():
         return {"ok": False, "error": "Ollama ist deaktiviert", "provider": PROVIDER}
@@ -147,7 +150,11 @@ async def chat(
         payload["format"] = "json"
 
     try:
-        async with httpx.AsyncClient(timeout=_timeout()) as client:
+        timeout = _timeout()
+        if timeout_seconds:
+            timeout = httpx.Timeout(connect=5.0, read=float(timeout_seconds),
+                                    write=30.0, pool=5.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.post(f"{base_url()}/api/chat", json=payload)
             if resp.status_code >= 400:
                 err = f"HTTP {resp.status_code}: {resp.text[:200]}"

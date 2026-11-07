@@ -1,5 +1,5 @@
 name: "ElektroCoach"
-version: "1.0.14"
+version: "1.0.15"
 slug: "elektrocoach"
 description: "KI-Lernplattform für Elektroniker Energie- und Gebäudetechnik mit OCR-Import, Lernsystem, Prüfungssimulation und Schaltplan-Editor"
 url: "https://github.com/Dealwirth/ElektroCoach/tree/main/elektrocoach"
@@ -41,6 +41,15 @@ options:
   ocr_refine_formulas: true
   ollama_refine_model: ""
   ocr_vision_use_draft: false
+  ocr_vision_passes: 3
+  ocr_timeout_seconds: 900
+  ocr_vision_models: ""
+  ocr_vision_group_size: 3
+  ocr_vision_full_page: true
+  ocr_vision_fraction_pass: true
+  ocr_vision_windows: true
+  ocr_vision_isolated: true
+  ocr_vision_reference_weight: 2
   ollama_enabled: false
   ocr_languages: "deu+eng"
   ocr_engine: "auto"
@@ -70,6 +79,15 @@ schema:
   ocr_refine_formulas: "bool"
   ollama_refine_model: "str"
   ocr_vision_use_draft: "bool"
+  ocr_vision_passes: "int(1,3)"
+  ocr_timeout_seconds: "int(60,3600)"
+  ocr_vision_models: "str"
+  ocr_vision_group_size: "int(1,6)"
+  ocr_vision_full_page: "bool"
+  ocr_vision_fraction_pass: "bool"
+  ocr_vision_windows: "bool"
+  ocr_vision_isolated: "bool"
+  ocr_vision_reference_weight: "int(1,5)"
   ollama_enabled: "bool"
   ocr_languages: "str"
   ocr_engine: "list(auto|trocr|tesseract)"

@@ -142,6 +142,19 @@ def test_import_erkennt_duplikate(client):
     assert job2["duplicates"] >= 1
 
 
+def test_importverlauf_zeigt_ergebniszahlen(client):
+    files = [("files", ("verlauf.txt", b"Leitungsschutzschalter Ausloesekennlinie " * 5, "text/plain"))]
+    job_id = client.post("/api/import", files=files).json()["job_id"]
+    _wait_for_job(client, job_id)
+
+    listing = client.get("/api/import/jobs").json()
+    entry = next(item for item in listing["items"] if item["id"] == job_id)
+    # Die Verlaufstabelle braucht importiert/Duplikate auch in der Liste.
+    assert entry["imported"] >= 1
+    assert entry["duplicates"] == 0
+    assert "stats_json" not in entry
+
+
 def test_import_ueber_zip_sammlung(client):
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:

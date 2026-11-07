@@ -290,15 +290,15 @@ def test_echtes_modell_liest_eine_zeile(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Zeilenweises Lesen (Bildmodell)
+# Blockweises Lesen (Bildmodell)
 # ---------------------------------------------------------------------------
 def test_line_image_skaliert_kleine_zeile():
     from app.services import handwriting_vision
 
     line = Image.new("RGB", (400, 40), color=255)
     scaled = handwriting_vision._line_image(line)
-    assert scaled.height == handwriting_vision.LINE_TARGET_HEIGHT
-    assert scaled.width == 400 * handwriting_vision.LINE_TARGET_HEIGHT // 40
+    assert scaled.height == handwriting_vision.GROUP_MIN_HEIGHT
+    assert scaled.width == 400 * handwriting_vision.GROUP_MIN_HEIGHT // 40
 
 
 def test_line_image_laesst_grosse_zeile_unveraendert():
@@ -306,6 +306,16 @@ def test_line_image_laesst_grosse_zeile_unveraendert():
 
     line = Image.new("RGB", (500, 400), color=255)
     assert handwriting_vision._line_image(line).size == (500, 400)
+
+
+def test_block_image_setzt_zeilen_untereinander():
+    from app.services import handwriting_vision
+
+    lines = [Image.new("RGB", (300, 40), color=255) for _ in range(3)]
+    block = handwriting_vision._block_image(lines)
+    assert block.height >= handwriting_vision.GROUP_MIN_HEIGHT
+    # Seitenverhaeltnis der Zeilen bleibt beim Hochskalieren erhalten.
+    assert block.width == round(300 * block.height / (3 * 40 + 2 * handwriting_vision.GROUP_GAP))
 
 
 def test_line_slices_teilt_ueberlange_zeile():
@@ -329,3 +339,192 @@ def test_merge_lines_entfernt_doppelte_naht():
 
     merged = handwriting_vision._merge_lines(["R = 1", "R = 1", "U = 2"])
     assert merged == "R = 1\nU = 2"
+
+
+def test_consensus_bevorzugt_die_mehrheit_der_zahlen():
+    from app.services import handwriting_vision
+
+    # Zwei Lesungen nennen 375, eine nur 75: die Mehrheit gewinnt.
+    best = handwriting_vision._consensus(["R = 375 Ohm", "R = 375 Ohm", "R = 75 Ohm"])
+    assert "375" in best
+
+
+def test_pick_line_nimmt_die_vollstaendigere_lesung():
+    from app.services import handwriting_vision
+
+    # Der Bruch-Nenner 0,3 fehlt in zwei Lesungen, in einer steht er. Alle
+    # Lesungen nennen 0,0178; die Zeile mit dem zusaetzlichen Nenner gewinnt.
+    candidates = [
+        "A = rho * l / R = 0,0178 * 100 m = 9,27 mm2",
+        "A = rho * l / R = 0,0178 * 100 m = 9,27 mm2",
+        "A = rho * l / R = 0,0178 * 100 m / 0,3 Ohm = 9,27 mm2",
+    ]
+    best = handwriting_vision._pick_line(candidates)
+    assert "0,3" in best
+
+
+def test_pick_line_bei_einer_lesung():
+    from app.services import handwriting_vision
+
+    assert handwriting_vision._pick_line(["R = 375 Ohm"]) == "R = 375 Ohm"
+
+
+def test_pick_line_gewichtete_stimmen_schlagen_die_mehrheit():
+    from app.services import handwriting_vision
+
+    # Die Bezugslesung (erste, Gewicht 2) nennt 5,93; zwei uebrige nennen 9,2.
+    # Ohne Gewichtung gewaenne die Mehrheit; mit Gewicht die Bezugslesung.
+    candidates = ["A = 5,93 mm2", "A = 9,2 mm2", "A = 9,2 mm2"]
+    assert handwriting_vision._pick_line(candidates, [2, 1, 1]) == "A = 5,93 mm2"
+
+
+def test_merge_readings_gewichtet_die_referenz():
+    from app.services import handwriting_vision
+
+    # Die Bezugslesung (Gewicht 3) nennt 5,93; zwei Blockdurchgaenge nennen 9,2.
+    reference = ["A = 5,93 mm2"]
+    readings = [reference, ["A = 9,2 mm2"], ["A = 9,2 mm2"]]
+    merged = handwriting_vision._merge_readings(readings, 1, reference=reference, reference_weight=3)
+    assert "5,93" in merged
+
+
+def test_merge_readings_zaehlt_die_referenz_nur_einmal():
+    from app.services import handwriting_vision
+
+    # Bei Gewicht 1 darf die Referenz nicht zusaetzlich als gewoehnliche Stimme
+    # zaehlen, sonst haette sie still das doppelte Gewicht.
+    reference = ["A = 5,93 mm2"]
+    readings = [reference, ["A = 9,2 mm2"], ["A = 9,2 mm2"]]
+    merged = handwriting_vision._merge_readings(readings, 1, reference=reference, reference_weight=1)
+    assert "9,2" in merged
+
+
+def test_merge_readings_ohne_referenz_bleibt_stabil():
+    from app.services import handwriting_vision
+
+    readings = [["R = 1", "U = 2"], ["R = 1", "U = 2"], ["R = 1", "U = 2"]]
+    merged = handwriting_vision._merge_readings(readings, 2)
+    assert "R = 1" in merged and "U = 2" in merged
+
+
+def test_arithmetic_score_erkennt_aufgehende_rechnung():
+    from app.services import handwriting_vision
+
+    ok, bad = handwriting_vision._arithmetic_score("R = 0,0178 * 100 / 0,3 = 5,93")
+    assert ok == 1 and bad == 0
+    ok, bad = handwriting_vision._arithmetic_score("0,6 * 7,5 = 4,5")
+    assert ok == 1 and bad == 0
+    ok, bad = handwriting_vision._arithmetic_score("0,6 * 7,5 = 4,9")
+    assert ok == 0 and bad == 1
+
+
+def test_pick_line_bevorzugt_aufgehende_rechnung_bei_gleichstand():
+    from app.services import handwriting_vision
+
+    # Beide Lesungen sind gleich lang und haben dieselbe Stimmenzahl (jede
+    # Zahl kommt genau einmal vor); erst der letzte Gleichstand entscheidet
+    # ueber die aufgehende Rechnung.
+    candidates = ["A = 6 * 1 = 7", "A = 2 * 3 = 6"]
+    best = handwriting_vision._pick_line(candidates)
+    assert best == "A = 2 * 3 = 6"
+
+
+def test_read_isolated_liest_jede_zeile_einzeln(monkeypatch):
+    import asyncio
+
+    from app.services import handwriting_vision
+
+    seen: list[int] = []
+
+    async def fake_read(image, prompt, selected, *, predict=0):
+        seen.append(image.width)
+        return "Zeile X"
+
+    monkeypatch.setattr(handwriting_vision, "_read_image", fake_read)
+    monkeypatch.setattr(
+        handwriting_vision,
+        "_block_image",
+        lambda block, height: type("I", (), {"height": 1, "width": block[0]})(),
+    )
+    result = asyncio.run(handwriting_vision._read_isolated([1, 2, 3], ["m"], height=320))
+    assert result == ["Zeile X", "Zeile X", "Zeile X"]
+    assert seen == [1, 2, 3]  # je Zeile genau ein Aufruf, nur diese Zeile im Bild
+
+
+def test_align_to_ordnet_verschobene_zeilen():
+    from app.services import handwriting_vision
+
+    reference = ["Aufgabe 1", "R = 1", "U = 2"]
+    reading = ["Aufgabe 1 R = 1", "U = 2"]
+    aligned = handwriting_vision._align_to(reference, reading)
+    assert aligned[2] == "U = 2"
+    assert aligned[0] == "Aufgabe 1 R = 1"
+
+
+def test_merge_readings_haelt_zeilen_bei_verschiebung():
+    from app.services import handwriting_vision
+
+    reference = ["Aufgabe 1", "R = 1", "U = 2"]
+    readings = [
+        ["Aufgabe 1", "R = 1", "U = 2"],
+        ["Aufgabe 1 R = 1", "U = 2"],
+    ]
+    merged = handwriting_vision._merge_readings(readings, 3)
+    assert "U = 2" in merged
+    assert "R = 1" in merged
+
+
+def test_read_windows_liest_je_zeile_die_erste_zeile(monkeypatch):
+    import asyncio
+
+    from app.services import handwriting_vision
+
+    calls: list[int] = []
+
+    async def fake_read(image, prompt, selected, *, predict=0):
+        # Jeder Aufruf entspricht einem Fenster; die Fensterbreite steckt in
+        # der Bildhoehe (jede Zeile ist hier gleich hoch).
+        calls.append(image.height)
+        return "Zeile A\nZeile B\nZeile C"
+
+    monkeypatch.setattr(handwriting_vision, "_read_image", fake_read)
+    lines = [object(), object(), object()]
+    monkeypatch.setattr(handwriting_vision, "_block_image", lambda block, height: type("I", (), {"height": len(block), "width": 1})())
+    result = asyncio.run(handwriting_vision._read_windows(lines, ["m"], height=320, size=2))
+    assert result == ["Zeile A", "Zeile A", "Zeile A"]
+    # Fenster 0 und 1 haben zwei Zeilen, Fenster 2 nur eine.
+    assert calls == [2, 2, 1]
+
+
+def test_pass_heights_aus_den_einstellungen():
+    from app.config import settings
+    from app.services import handwriting_vision
+
+    with settings._lock:
+        runtime = dict(settings._runtime)
+    try:
+        settings.set_runtime("ocr_vision_passes", 1)
+        assert handwriting_vision._pass_heights() == [handwriting_vision.GROUP_PASS_HEIGHTS[0]]
+        settings.set_runtime("ocr_vision_passes", 3)
+        assert handwriting_vision._pass_heights() == list(handwriting_vision.GROUP_PASS_HEIGHTS)
+        settings.set_runtime("ocr_vision_passes", 99)
+        assert len(handwriting_vision._pass_heights()) == len(handwriting_vision.GROUP_PASS_HEIGHTS)
+    finally:
+        with settings._lock:
+            settings._runtime = runtime
+
+
+def test_ocr_timeout_ist_einstellbar():
+    from app.config import settings
+    from app.services import handwriting_vision
+
+    with settings._lock:
+        runtime = dict(settings._runtime)
+    try:
+        settings.set_runtime("ocr_timeout_seconds", 1200)
+        assert handwriting_vision._ocr_timeout() == 1200
+        settings.set_runtime("ocr_timeout_seconds", 5)
+        assert handwriting_vision._ocr_timeout() == 30
+    finally:
+        with settings._lock:
+            settings._runtime = runtime

@@ -62,6 +62,35 @@ DEFAULTS: dict[str, Any] = {
     # TrOCR-Entwurf als Hinweis an das Bildmodell geben. Bei schwerer
     # Handschrift schadet der Entwurf mehr, als er nuetzt.
     "ocr_vision_use_draft": False,
+    # Durchgaenge je Zeile. Mehr Durchgaenge bei verschiedenen Aufloesungen
+    # bilden einen Konsens und lesen schwere Ziffern zuverlaessiger; das kostet
+    # nur Zeit. 1 = schnell, 3 = gruendlich.
+    "ocr_vision_passes": 3,
+    # Lesezeitlimit der Bilderkennung. Auf dem Pi 4 dauert eine Seite mehrere
+    # Minuten; Vollstaendigkeit geht hier vor Geschwindigkeit.
+    "ocr_timeout_seconds": 900,
+    # Mehrere Bildmodelle fuer die Mehrfachlesung (kommagetrennt). Leer = nur
+    # das Standardmodell. Auf dem Pi 4 besser ein einzelnes Modell.
+    "ocr_vision_models": "",
+    # Zeilen je Block beim Lesen der Handschrift.
+    "ocr_vision_group_size": 3,
+    # Zusaetzlich die ganze Seite in einem Bild lesen (Kontextabgleich).
+    "ocr_vision_full_page": True,
+    # Zusaetzlicher Durchgang mit Bruch-Hinweis. Liefert nur Stimmen fuer den
+    # Zeilenabgleich, damit ein erfundener Nenner nicht gewinnen kann.
+    "ocr_vision_fraction_pass": True,
+    # Je Zeile ein eigenes Fenster (gelesen wird die erste Zeile). Die erste
+    # Zeile eines Ausschnitts liest das Modell am zuverlaessigsten.
+    "ocr_vision_windows": True,
+    # Jede Zeile einzeln (nur diese Zeile im Bild) lesen. Ohne Nachbarzeilen
+    # faellt die Verwechslung benachbarter Zahlen weg; die Lesung ist die
+    # genaueste und dient als Bezug fuer den Zeilenabgleich.
+    "ocr_vision_isolated": True,
+    # Gewicht der Bezugslesung bei der Zeilenwahl. 2 = doppelt so viele
+    # Stimmen wie ein Blockdurchgang. Die Einzelzeilen-Lesung ist die
+    # genaueste; ein einzelner Ausreisser soll sie nicht kippen, sie soll aber
+    # auch nicht jede mehrfach bestaetigte Zahl der uebrigen Wege verdraengen.
+    "ocr_vision_reference_weight": 2,
     # Nachbearbeitung: off | light | standard | formula
     "ocr_postprocess": "formula",
     # Maximale Zeilenlaenge (Token) je TrOCR-Durchlauf.

@@ -74,6 +74,37 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return payload as T;
 }
 
+async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}/${path.replace(/^\//, "")}`);
+  } catch (error) {
+    throw new ApiError(0, `Keine Verbindung zum Server: ${String(error)}`);
+  }
+  if (!response.ok) {
+    const text = await response.text();
+    let detail: unknown = text;
+    try {
+      detail = JSON.parse(text);
+    } catch {
+      /* Klartextmeldung beibehalten */
+    }
+    throw new ApiError(response.status, describeDetail((detail as { detail?: unknown })?.detail ?? detail));
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  const name = match?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function query(params: Record<string, unknown>): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -226,6 +257,8 @@ export const api = {
     }),
   compareExams: () => request<Record<string, unknown>>("exams/compare"),
   deleteExam: (id: string) => request<{ ok: boolean }>(`exams/${id}`, { method: "DELETE" }),
+  downloadExamPdf: (id: string, solutions = false) =>
+    downloadFile(`exams/${id}/pdf${solutions ? "?solutions=true" : ""}`, solutions ? "Loesungen.pdf" : "Pruefung.pdf"),
 
   // Schaltplan
   schematicLibrary: () =>

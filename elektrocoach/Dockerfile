@@ -23,7 +23,7 @@ ENV LANG=C.UTF-8 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    ELEKTROCOACH_BUILD="1.0.14"
+    ELEKTROCOACH_BUILD="1.0.15"
 
 RUN apk add --no-cache \
         python3 \
@@ -41,6 +41,7 @@ RUN apk add --no-cache \
         tesseract-ocr-data-eng \
         tesseract-ocr-data-equ \
         poppler-utils \
+        font-dejavu \
         jq
 
 WORKDIR /app
@@ -65,7 +66,7 @@ LABEL \
     io.hass.name="ElektroCoach" \
     io.hass.description="KI-Lernplattform für Elektroniker Energie- und Gebäudetechnik" \
     io.hass.type="app" \
-    io.hass.version="1.0.14" \
+    io.hass.version="1.0.15" \
     io.hass.arch="aarch64|amd64"
 
 CMD [ "/run.sh" ]

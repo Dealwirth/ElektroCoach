@@ -450,6 +450,7 @@ function ReviewPageCard({
 }) {
   const [text, setText] = useState(page.text);
   const [busy, setBusy] = useState(false);
+  const [showImage, setShowImage] = useState(true);
 
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4">
@@ -459,12 +460,24 @@ function ReviewPageCard({
         <span className="truncate">{page.filename}</span>
         {page.ocr_confidence !== null && <span>OCR {Math.round(page.ocr_confidence)} %</span>}
       </div>
-      <textarea
-        className="input min-h-[120px] font-mono text-xs"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-      />
-      <div className="mt-2 flex gap-2">
+      <div className="grid gap-3 lg:grid-cols-2">
+        {showImage && (
+          <div className="rounded-lg border border-ink-100 bg-white p-1">
+            <img
+              src={api.pageImageUrl(page.id)}
+              alt={`Original Seite ${page.page_number}`}
+              className="max-h-[420px] w-full object-contain"
+              loading="lazy"
+            />
+          </div>
+        )}
+        <textarea
+          className="input min-h-[160px] font-mono text-xs lg:min-h-full"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+        />
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
           className="btn-primary btn-sm"
@@ -481,8 +494,15 @@ function ReviewPageCard({
         >
           {busy ? "Speichern …" : "Bestätigen und speichern"}
         </button>
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          onClick={() => setShowImage((value) => !value)}
+        >
+          {showImage ? "Original ausblenden" : "Original einblenden"}
+        </button>
         <a href={api.pageImageUrl(page.id)} target="_blank" rel="noreferrer" className="btn-secondary btn-sm">
-          Original ansehen
+          Original in neuem Tab
         </a>
       </div>
     </div>

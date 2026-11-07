@@ -326,6 +326,9 @@ def normalize_formulas(text: str) -> str:
         # (R = h * l / A). Nur in dieser Formelstellung ersetzen.
         line = re.sub(r"\bh\b(?=\s*[·×*]\s*[lL]\b)", "ρ", line)
         line = re.sub(r"\b[hg]\b(?=\s*[·×*]\s*[lL]\s*/)", "ρ", line)
+        # ... auch im Nenner (l = R * A / h) und als Faktor vor der Laenge.
+        line = re.sub(r"/\s*[hg]\b(?=\s*[=·×*/)]|$)", "/ ρ", line)
+        line = re.sub(r"\b[hg]\b(?=\s*[·×*]\s*\d)", "ρ", line)
         # Mal-Zeichen zwischen Zahlen.
         line = re.sub(r"(?<=\d)\s*[x×]\s*(?=\d)", " × ", line)
         # Dezimalkomma: "1.5" -> "1,5" (Tausenderpunkt bleibt).
