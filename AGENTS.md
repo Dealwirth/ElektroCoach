@@ -131,6 +131,28 @@ Kontingent). Ziel: Raspberry Pi 4, 8 GB, Home Assistant OS, aarch64.
       `handwriting.preprocess()` (Seite freistellen, begradigen), sonst liest
       es den Bildschirmrahmen mit.
 
+16. **Handschrift: die Einzelzeilen-Lesung ist der Anker.** Jede Zeile wird
+    zusätzlich ganz allein gelesen (`ocr_vision_isolated`). Ohne Nachbarzeilen
+    entfällt die Verwechslung benachbarter Zahlen. Diese Lesung dient als Bezug
+    für den Zeilenabgleich und zählt `ocr_vision_reference_weight`-fach (Standard
+    2). Sie darf nicht ein zweites Mal als gewöhnliche Stimme zählen.
+17. **Zweitmodell hilft hier nicht.** `qwen2.5vl:3b` liefert auf der
+    Handschrift deutlich weniger Zahlen als `qwen2.5vl:7b` und verschlechtert den
+    Konsens (gemessen). `ocr_vision_models` leer lassen. Auch das deutsche
+    TrOCR-Modell liefert nur wenige Zahlen und taugt hier nicht als Stimme.
+18. **Höhere Auflösung bringt nichts, kostet viel.** Einzelzeilen bei 512/640 px
+    Höhe brauchen auf dem Pi ein Vielfaches der Zeit und verlieren dieselben
+    kleinen Indizes. Bei großen Einzelbildern (hohe Auflösung) das Kontextfenster
+    (`num_ctx`) mitziehen, sonst antwortet Ollama mit HTTP 400 „exceeds the
+    available context size".
+19. **Kleine Indizes sind die harte Grenze.** Ziffern wie `0,196`, `1,5`, `2,5`,
+    `3,56` (tiefgestellt, klein) erkennt das Bildmodell nicht zuverlässig. Diese
+    Stellen bleiben der Korrektur-Oberfläche überlassen; nicht als Automatik
+    ausgeben, sondern zur Kontrolle markieren.
+20. **Kennzahlen richtig messen.** `mm²` darf nicht als Ziffer `2` gezählt
+    werden: hochgestellte Zeichen vor dem Zählen entfernen. Sonst ist die
+    Trefferquote künstlich hoch.
+
 ## Git
 
 * Nie direkt auf `main` pushen. Branch anlegen, PR öffnen, mergen.
